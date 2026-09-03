@@ -1,0 +1,99 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int              @id @default(autoincrement())
+  email          String           @unique
+  passwordHash   String
+  status         String           @default("ACTIVE")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  authorization  MetaAuthorization?
+  pages          AuthorizedPage[]
+  actionLogs     ActionLog[]
+  actionReceipts ActionReceipt[]
+}
+
+model MetaOAuthState {
+  id         String    @id @default(uuid())
+  stateHash  String    @unique
+  userId     Int
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model MetaAuthorization {
+  id                  String    @id @default(uuid())
+  userId              Int       @unique
+  facebookUserId      String
+  facebookUserName    String?
+  userTokenCiphertext String    @db.Text
+  grantedScopes       String
+  status              String    @default("ACTIVE")
+  tokenExpiresAt      DateTime?
+  authorizedAt        DateTime  @default(now())
+  lastVerifiedAt      DateTime?
+  updatedAt           DateTime  @updatedAt
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuthorizedPage {
+  id                  String    @id @default(uuid())
+  userId              Int
+  pageId              String
+  pageName            String
+  category            String?
+  tasks               String
+  pageTokenCiphertext String    @db.Text
+  canRead             Boolean   @default(false)
+  canPublish          Boolean   @default(false)
+  canManageComments   Boolean   @default(false)
+  status              String    @default("ACTIVE")
+  authorizedAt        DateTime  @default(now())
+  lastVerifiedAt      DateTime?
+  updatedAt           DateTime  @updatedAt
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pageId])
+  @@index([userId, status])
+}
+
+model ActionReceipt {
+  id          String   @id @default(uuid())
+  userId      Int
+  action      String
+  key         String
+  requestHash String
+  resultJson  Json
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, action, key])
+  @@index([userId, createdAt])
+}
+
+model ActionLog {
+  id           String   @id @default(uuid())
+  userId       Int
+  action       String
+  pageId       String?
+  status       String
+  requestJson  Json?
+  resultJson   Json?
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
