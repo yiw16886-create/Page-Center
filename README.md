@@ -20,7 +20,7 @@
 3. 执行迁移：`npm run db:migrate`
 4. 启动：`npm run dev`
 
-首次启动会在数据库不存在 `ADMIN_EMAIL` 时创建管理员。后续修改 `ADMIN_PASSWORD` 不会自动覆盖已有密码。
+首次启动会在数据库不存在 `ADMIN_EMAIL` 时创建管理员。单管理员模式下，后续修改 Vercel 的 `ADMIN_PASSWORD` 会在下一次服务初始化时安全更新数据库密码哈希，因此当前环境变量中的密码是登录凭据来源。
 
 `JWT_SECRET` 是可选覆盖项；未配置或不足 32 个字符时，应用会从 32 字节的 `TOKEN_ENCRYPTION_KEY` 派生独立的会话签名密钥。轮换实际使用的密钥会使现有登录会话失效。
 

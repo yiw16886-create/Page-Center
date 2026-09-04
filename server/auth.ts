@@ -55,5 +55,10 @@ export async function ensureAdmin() {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (!existing) {
     await prisma.user.create({ data: { email, passwordHash: await bcrypt.hash(password, 12) } });
+  } else if (!(await bcrypt.compare(password, existing.passwordHash))) {
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: { passwordHash: await bcrypt.hash(password, 12), status: "ACTIVE" },
+    });
   }
 }

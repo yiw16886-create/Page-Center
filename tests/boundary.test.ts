@@ -39,3 +39,9 @@ test("deployment applies migrations before building", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.match(pkg.scripts.build, /prisma migrate deploy/);
 });
+
+test("admin bootstrap reconciles a changed environment password", () => {
+  const auth = read("server/auth.ts");
+  assert.match(auth, /bcrypt\.compare\(password, existing\.passwordHash\)/);
+  assert.match(auth, /prisma\.user\.update/);
+});
