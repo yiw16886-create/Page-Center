@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, FileText, KeyRound, LogOut, RefreshCw, Send, ShieldCheck, Unplug, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
-import { api, type MetaStatus, type Page, type Post, type User } from "./api";
+import { api, ApiError, type MetaStatus, type Page, type Post, type User } from "./api";
 
 function Login({ onLogin }: { onLogin: (user: User) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  return <main className="login-shell"><section className="login-card"><div className="brand-mark"><FileText /></div><p className="eyebrow">META PAGE CENTER</p><h1>公共主页管理与发布</h1><p className="muted">登录后连接 Meta，仅管理你授权的公共主页。</p><form onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { onLogin(await api.login(email, password)); } catch { toast.error("账号或密码错误"); } finally { setBusy(false); } }}><label>邮箱<input autoComplete="username" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label><label>密码<input autoComplete="current-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label><button className="primary full" disabled={busy}>{busy ? "登录中…" : "登录"}</button></form><p className="security-note"><ShieldCheck size={16} /> 登录会话保存在 HttpOnly Cookie 中</p></section></main>;
+  return <main className="login-shell"><section className="login-card"><div className="brand-mark"><FileText /></div><p className="eyebrow">META PAGE CENTER</p><h1>公共主页管理与发布</h1><p className="muted">登录后连接 Meta，仅管理你授权的公共主页。</p><form onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { onLogin(await api.login(email, password)); } catch (error) { toast.error(error instanceof ApiError && error.status === 401 ? "账号或密码错误" : "服务尚未初始化，请检查数据库和环境变量"); } finally { setBusy(false); } }}><label>邮箱<input autoComplete="username" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label><label>密码<input autoComplete="current-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label><button className="primary full" disabled={busy}>{busy ? "登录中…" : "登录"}</button></form><p className="security-note"><ShieldCheck size={16} /> 登录会话保存在 HttpOnly Cookie 中</p></section></main>;
 }
 
 function Badge({ ok, children }: { ok: boolean; children: string }) { return <span className={ok ? "badge ok" : "badge"}>{ok && <Check size={12} />}{children}</span>; }

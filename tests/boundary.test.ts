@@ -25,3 +25,17 @@ test("write endpoint requires CSRF, confirmation and idempotency", () => {
   assert.match(service, /state: "PENDING"/);
   assert.match(service, /ActionLog|actionLog/);
 });
+
+test("login distinguishes invalid credentials from service initialization errors", () => {
+  const api = read("src/api.ts");
+  const app = read("src/App.tsx");
+  const routes = read("server/routes.ts");
+  assert.match(api, /class ApiError/);
+  assert.match(app, /error\.status === 401/);
+  assert.match(routes, /SERVICE_NOT_READY/);
+});
+
+test("deployment applies migrations before building", () => {
+  const pkg = JSON.parse(read("package.json"));
+  assert.match(pkg.scripts.build, /prisma migrate deploy/);
+});

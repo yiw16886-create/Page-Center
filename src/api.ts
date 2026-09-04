@@ -1,9 +1,15 @@
 const headers = { "Content-Type": "application/json", "X-Page-Center-CSRF": "1" };
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly code?: string) {
+    super(message);
+  }
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: "same-origin", ...init });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error || "REQUEST_FAILED");
+  if (!response.ok) throw new ApiError(body.error || "REQUEST_FAILED", response.status, body.code);
   return body.data as T;
 }
 

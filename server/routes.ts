@@ -9,18 +9,23 @@ const router = Router();
 const asyncRoute = (handler: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => Promise.resolve(handler(req, res)).catch(next);
 
 router.post("/auth/login", requireCsrf, asyncRoute(async (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || user.status !== "ACTIVE" || !(await bcrypt.compare(password, user.passwordHash))) return res.status(401).json({ success: false, error: "账号或密码错误" });
-  issueSession(res, { id: user.id, email: user.email });
-  res.json({ success: true, data: { id: user.id, email: user.email } });
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.status !== "ACTIVE" || !(await bcrypt.compare(password, user.passwordHash))) return res.status(401).json({ success: false, error: "账号或密码错误", code: "INVALID_CREDENTIALS" });
+    issueSession(res, { id: user.id, email: user.email });
+    res.json({ success: true, data: { id: user.id, email: user.email } });
+  } catch (error) {
+    console.error(JSON.stringify({ level: "error", message: "login_database_failed", error: error instanceof Error ? error.message : String(error) }));
+    return res.status(503).json({ success: false, error: "服务尚未完成数据库初始化", code: "SERVICE_NOT_READY" });
+  }
 }));
 router.post("/auth/logout", requireCsrf, (_req, res) => { clearSession(res); res.json({ success: true }); });
 router.get("/auth/me", authenticate, (req: AuthenticatedRequest, res) => res.json({ success: true, data: req.actor }));
+router.get("/readiness", (_req, res) => res.json({ success: true, data: readiness() }));
 
 router.use(authenticate);
-router.get("/readiness", (_req, res) => res.json({ success: true, data: readiness() }));
 router.get("/meta/status", asyncRoute(async (req: AuthenticatedRequest, res) => res.json({ success: true, data: await status(req.actor!.id) })));
 router.post("/meta/connect", requireCsrf, asyncRoute(async (req: AuthenticatedRequest, res) => res.json({ success: true, data: { url: await createAuthorizationUrl(req.actor!, metaConfig()) } })));
 router.post("/meta/verify", requireCsrf, asyncRoute(async (req: AuthenticatedRequest, res) => res.json({ success: true, data: await verifyAuthorization(req.actor!, metaConfig()) })));

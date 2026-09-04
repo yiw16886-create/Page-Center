@@ -1,11 +1,9 @@
 import "dotenv/config";
 import path from "node:path";
 import express from "express";
-import { assertProductionConfig } from "./config.js";
 import { ensureAdmin } from "./auth.js";
 import { createApp } from "./app.js";
 
-assertProductionConfig();
 const app = createApp();
 
 const port = Number(process.env.PORT || 3000);
