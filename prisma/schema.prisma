@@ -19,6 +19,22 @@ model User {
   pages          AuthorizedPage[]
   actionLogs     ActionLog[]
   actionReceipts ActionReceipt[]
+  pluginTokens   PluginAccessToken[]
+}
+
+model PluginAccessToken {
+  id          String    @id @default(uuid())
+  userId      Int
+  name        String
+  tokenHash   String    @unique
+  tokenPrefix String
+  status      String    @default("ACTIVE")
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
 }
 
 model MetaOAuthState {

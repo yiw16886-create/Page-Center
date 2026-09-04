@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "meta-page-center-private": {
+      "type": "http",
+      "url": "https://page-center-tau.vercel.app/api/mcp",
+      "bearer_token_env_var": "PAGE_CENTER_PLUGIN_TOKEN"
+    }
+  }
+}

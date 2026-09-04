@@ -1,0 +1,28 @@
+{
+  "name": "meta-page-center-private",
+  "version": "0.1.0",
+  "description": "Privately manage authorized Meta Pages and publish confirmed posts.",
+  "author": {
+    "name": "yiw16886-create",
+    "url": "https://github.com/yiw16886-create"
+  },
+  "homepage": "https://page-center-tau.vercel.app",
+  "repository": "https://github.com/yiw16886-create/Page-Center",
+  "keywords": ["meta", "facebook-pages", "publishing", "private"],
+  "interface": {
+    "displayName": "Meta 公共主页（私人）",
+    "shortDescription": "读取并发布到你授权的 Meta 公共主页。",
+    "longDescription": "连接独立 Page Center，以私人 Token 读取已授权主页和帖子，并在明确确认后发布帖子。",
+    "developerName": "yiw16886-create",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://page-center-tau.vercel.app",
+    "defaultPrompt": [
+      "列出我已授权的 Meta 公共主页。",
+      "读取指定公共主页的最近帖子。",
+      "确认后把这段内容发布到指定公共主页。"
+    ],
+    "brandColor": "#1877F2"
+  },
+  "mcpServers": "./.mcp.json"
+}

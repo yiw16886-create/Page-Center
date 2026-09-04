@@ -8,12 +8,30 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("standalone schema has no SaaS tenant binding", () => {
   const schema = read("prisma/schema.prisma");
-  for (const term of ["Organization", "orgId", "org_id", "tenantId", "workspaceId"]) assert.equal(schema.includes(term), false);
+  for (const term of [
+    "Organization",
+    "orgId",
+    "org_id",
+    "tenantId",
+    "workspaceId",
+  ])
+    assert.equal(schema.includes(term), false);
 });
 
 test("standalone app excludes legacy modules", () => {
-  const files = fs.readdirSync(path.join(root, "server"), { recursive: true }).map(String).join("\n").toLowerCase();
-  for (const term of ["ad-center", "store-sync", "account-health", "project-board", "business-manager"]) assert.equal(files.includes(term), false);
+  const files = fs
+    .readdirSync(path.join(root, "server"), { recursive: true })
+    .map(String)
+    .join("\n")
+    .toLowerCase();
+  for (const term of [
+    "ad-center",
+    "store-sync",
+    "account-health",
+    "project-board",
+    "business-manager",
+  ])
+    assert.equal(files.includes(term), false);
 });
 
 test("write endpoint requires CSRF, confirmation and idempotency", () => {
@@ -44,4 +62,46 @@ test("admin bootstrap reconciles a changed environment password", () => {
   const auth = read("server/auth.ts");
   assert.match(auth, /bcrypt\.compare\(password, existing\.passwordHash\)/);
   assert.match(auth, /prisma\.user\.update/);
+});
+
+test("private plugin tokens are hashed, revocable, and isolated from browser sessions", () => {
+  const service = read("server/plugin-token-service.ts");
+  const schema = read("prisma/schema.prisma");
+  const routes = read("server/routes.ts");
+  assert.match(service, /createHash\("sha256"\)/);
+  assert.match(service, /randomBytes\(32\)/);
+  assert.match(service, /status: "REVOKED"/);
+  assert.match(schema, /model PluginAccessToken/);
+  assert.match(schema, /tokenHash\s+String\s+@unique/);
+  assert.doesNotMatch(schema, /rawToken|plaintextToken/);
+  assert.match(routes, /requireCsrf/);
+});
+
+test("private MCP exposes only scoped Page tools and preserves publish safeguards", () => {
+  const mcp = read("server/mcp.ts");
+  const app = read("server/app.ts");
+  for (const tool of ["list_pages", "get_page_posts", "publish_page_post"]) {
+    assert.match(mcp, new RegExp(`registerTool\\(\\s*"${tool}"`));
+  }
+  assert.match(mcp, /confirmationText/);
+  assert.match(mcp, /idempotencyKey/);
+  assert.match(mcp, /destructiveHint: true/);
+  assert.match(app, /requirePluginToken/);
+});
+
+test("plugin package targets the private production MCP endpoint", () => {
+  const manifest = JSON.parse(
+    read("plugins/meta-page-center-private/.codex-plugin/plugin.json"),
+  );
+  const config = JSON.parse(read("plugins/meta-page-center-private/.mcp.json"));
+  assert.equal(manifest.name, "meta-page-center-private");
+  assert.deepEqual(manifest.interface.capabilities, ["Read", "Write"]);
+  assert.equal(
+    config.mcpServers["meta-page-center-private"].url,
+    "https://page-center-tau.vercel.app/api/mcp",
+  );
+  assert.equal(
+    config.mcpServers["meta-page-center-private"].bearer_token_env_var,
+    "PAGE_CENTER_PLUGIN_TOKEN",
+  );
 });
