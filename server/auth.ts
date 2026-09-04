@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { sessionSecret } from "./config.js";
 import prisma from "./db.js";
 
 export const SESSION_COOKIE = "page_center_session";
@@ -9,17 +10,8 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 export type Actor = { id: number; email: string };
 export type AuthenticatedRequest = Request & { actor?: Actor };
 
-function jwtSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
-    if (process.env.NODE_ENV === "production") throw new Error("JWT_SECRET_INVALID");
-    return "local-development-secret-change-me-now";
-  }
-  return secret;
-}
-
 export function issueSession(res: Response, actor: Actor) {
-  const token = jwt.sign(actor, jwtSecret(), { expiresIn: SESSION_TTL_SECONDS });
+  const token = jwt.sign(actor, sessionSecret(), { expiresIn: SESSION_TTL_SECONDS });
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -37,7 +29,7 @@ export async function authenticate(req: AuthenticatedRequest, res: Response, nex
   try {
     const token = req.cookies?.[SESSION_COOKIE];
     if (!token) return res.status(401).json({ success: false, error: "请先登录" });
-    const payload = jwt.verify(token, jwtSecret()) as Actor;
+    const payload = jwt.verify(token, sessionSecret()) as Actor;
     const user = await prisma.user.findUnique({ where: { id: payload.id }, select: { id: true, email: true, status: true } });
     if (!user || user.status !== "ACTIVE") return res.status(401).json({ success: false, error: "登录已失效" });
     req.actor = { id: user.id, email: user.email };

@@ -1,8 +1,9 @@
+import { createHmac } from "node:crypto";
 import { z } from "zod";
 
 const productionSchema = z.object({
   DATABASE_URL: z.string().min(1),
-  JWT_SECRET: z.string().min(32),
+  JWT_SECRET: z.string().min(32).optional(),
   TOKEN_ENCRYPTION_KEY: z.string().min(1),
   ADMIN_EMAIL: z.string().email(),
   ADMIN_PASSWORD: z.string().min(12),
@@ -31,10 +32,39 @@ export function metaConfig(env: NodeJS.ProcessEnv = process.env) {
   };
 }
 
+export function sessionSecret(env: NodeJS.ProcessEnv = process.env) {
+  const configured = env.JWT_SECRET?.trim();
+  if (configured) {
+    if (configured.length < 32) throw new Error("JWT_SECRET_INVALID");
+    return configured;
+  }
+
+  const encryptionKey = env.TOKEN_ENCRYPTION_KEY?.trim();
+  if (encryptionKey) {
+    const decoded = Buffer.from(encryptionKey, "base64");
+    if (decoded.length === 32) {
+      return createHmac("sha256", decoded)
+        .update("meta-page-center/session-signing/v1")
+        .digest("base64url");
+    }
+  }
+
+  if (env.NODE_ENV !== "production") return "local-development-secret-change-me-now";
+  throw new Error("JWT_SECRET_INVALID");
+}
+
 export function readiness(env: NodeJS.ProcessEnv = process.env) {
+  let sessionReady = false;
+  try {
+    sessionSecret(env);
+    sessionReady = true;
+  } catch {
+    sessionReady = false;
+  }
+
   const checks = [
     ["database", "数据库", env.DATABASE_URL],
-    ["session", "会话签名", env.JWT_SECRET && env.JWT_SECRET.length >= 32 ? "ok" : ""],
+    ["session", "会话签名", sessionReady ? "ok" : ""],
     ["cipher", "Token 加密", env.TOKEN_ENCRYPTION_KEY],
     ["meta-app", "Meta App", env.META_APP_ID && env.META_APP_SECRET ? "ok" : ""],
     ["callback", "OAuth 回调", env.META_REDIRECT_URI],

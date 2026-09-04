@@ -22,6 +22,8 @@
 
 首次启动会在数据库不存在 `ADMIN_EMAIL` 时创建管理员。后续修改 `ADMIN_PASSWORD` 不会自动覆盖已有密码。
 
+`JWT_SECRET` 是可选覆盖项；未配置时，应用会从 32 字节的 `TOKEN_ENCRYPTION_KEY` 派生独立的会话签名密钥。轮换任一密钥都会使现有登录会话失效。
+
 ## Meta 配置
 
 Meta App 的 Valid OAuth Redirect URI 必须与 `META_REDIRECT_URI` 完全一致。生产环境需要申请并获批：
