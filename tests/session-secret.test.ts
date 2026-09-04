@@ -19,6 +19,18 @@ test("session secret is deterministically derived from the encryption key", () =
   assert.equal(readiness(env).checks.find((check) => check.id === "session")?.ready, true);
 });
 
+test("a legacy short JWT secret falls back to the encryption key", () => {
+  const encryptionKey = randomBytes(32).toString("base64");
+  const env = {
+    NODE_ENV: "production",
+    JWT_SECRET: "legacy-short-value",
+    TOKEN_ENCRYPTION_KEY: encryptionKey,
+  } as NodeJS.ProcessEnv;
+  const derived = sessionSecret(env);
+  assert.ok(derived.length >= 32);
+  assert.notEqual(derived, env.JWT_SECRET);
+});
+
 test("production rejects missing or malformed session key material", () => {
   assert.throws(() => sessionSecret({ NODE_ENV: "production" } as NodeJS.ProcessEnv), /JWT_SECRET_INVALID/);
   assert.throws(

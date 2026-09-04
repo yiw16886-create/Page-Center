@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const productionSchema = z.object({
   DATABASE_URL: z.string().min(1),
-  JWT_SECRET: z.string().min(32).optional(),
+  JWT_SECRET: z.string().optional(),
   TOKEN_ENCRYPTION_KEY: z.string().min(1),
   ADMIN_EMAIL: z.string().email(),
   ADMIN_PASSWORD: z.string().min(12),
@@ -34,10 +34,7 @@ export function metaConfig(env: NodeJS.ProcessEnv = process.env) {
 
 export function sessionSecret(env: NodeJS.ProcessEnv = process.env) {
   const configured = env.JWT_SECRET?.trim();
-  if (configured) {
-    if (configured.length < 32) throw new Error("JWT_SECRET_INVALID");
-    return configured;
-  }
+  if (configured && configured.length >= 32) return configured;
 
   const encryptionKey = env.TOKEN_ENCRYPTION_KEY?.trim();
   if (encryptionKey) {

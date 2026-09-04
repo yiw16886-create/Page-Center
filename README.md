@@ -22,7 +22,7 @@
 
 首次启动会在数据库不存在 `ADMIN_EMAIL` 时创建管理员。后续修改 `ADMIN_PASSWORD` 不会自动覆盖已有密码。
 
-`JWT_SECRET` 是可选覆盖项；未配置时，应用会从 32 字节的 `TOKEN_ENCRYPTION_KEY` 派生独立的会话签名密钥。轮换任一密钥都会使现有登录会话失效。
+`JWT_SECRET` 是可选覆盖项；未配置或不足 32 个字符时，应用会从 32 字节的 `TOKEN_ENCRYPTION_KEY` 派生独立的会话签名密钥。轮换实际使用的密钥会使现有登录会话失效。
 
 ## Meta 配置
 
