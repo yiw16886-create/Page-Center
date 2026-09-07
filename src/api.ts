@@ -60,29 +60,12 @@ export type PluginToken = {
   createdAt: string;
   revokedAt: string | null;
 };
-export type StoreConnection = {
-  id: string;
-  provider: "SHOPLINE";
-  name: string;
-  handle: string;
-  publicStoreUrl: string;
-  status: string;
-  lastSyncedAt: string | null;
-  lastError: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-export type HotProduct = {
-  id: string;
-  storeConnectionId: string;
+export type ProductDraft = {
+  sourceUrl: string;
   title: string;
-  productUrl: string;
-  sales7d: number;
-  salesPrevious7d: number;
-  growthRate: number;
-  hotScore: number;
-  lastSeenAt: string;
-  storeConnection: { name: string };
+  description: string;
+  price: string | null;
+  imageUrls: string[];
 };
 
 export const api = {
@@ -118,32 +101,21 @@ export const api = {
       method: "DELETE",
       headers,
     }),
-  stores: () => request<StoreConnection[]>("/api/stores"),
-  saveShopline: (input: {
-    name: string;
-    handle: string;
-    publicStoreUrl: string;
-    accessToken: string;
-  }) =>
-    request<StoreConnection>("/api/stores/shopline", {
+  parseProduct: (url: string) =>
+    request<ProductDraft>("/api/product-drafts/parse", {
       method: "POST",
       headers,
-      body: JSON.stringify(input),
+      body: JSON.stringify({ url }),
     }),
-  syncStore: (connectionId: string) =>
-    request<{ products: number; ordersScanned: number; syncedAt: string }>(
-      `/api/stores/${encodeURIComponent(connectionId)}/sync`,
-      { method: "POST", headers },
-    ),
-  disconnectStore: (connectionId: string) =>
-    request<void>(`/api/stores/${encodeURIComponent(connectionId)}`, {
-      method: "DELETE",
+  generateProductCopy: (
+    product: ProductDraft,
+    options: { language: string; tone: string },
+  ) =>
+    request<{ message: string }>("/api/product-drafts/generate", {
+      method: "POST",
       headers,
+      body: JSON.stringify({ product, ...options }),
     }),
-  hotProducts: (storeId?: string) =>
-    request<HotProduct[]>(
-      `/api/products/hot?limit=20${storeId ? `&storeId=${encodeURIComponent(storeId)}` : ""}`,
-    ),
   posts: (pageId: string) =>
     request<{ posts: Post[]; nextCursor: string | null }>(
       `/api/pages/${encodeURIComponent(pageId)}/posts`,

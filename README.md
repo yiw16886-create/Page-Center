@@ -14,7 +14,7 @@
 - AES-256-GCM 加密保存用户 Token 和 Page Token
 - 私人 MCP 插件：OAuth 2.1 登录、列出主页、读取帖子、确认后发布帖子
 - 独立、可撤销的插件访问 Token（数据库只保存 SHA-256 哈希）
-- SHOPLINE 轻量商品链接同步与近 7 天热门评分
+- 商品链接临时解析、AI Facebook 文案生成与人工确认发布
 
 ## 本地启动
 
@@ -40,17 +40,18 @@ Meta App 的 Valid OAuth Redirect URI 必须与 `META_REDIRECT_URI` 完全一致
 
 应用仍处于 Development 模式时，只有 App 角色内的账号可以完成授权。
 
-## SHOPLINE 轻量商品索引
+## 商品链接智能发布
 
-在“设置”中连接 SHOPLINE，需要一个具有 `read_products` 和 `read_orders`
-权限的 Admin API Access Token、店铺 Handle 和公开商品域名。
+在“发布帖子”中粘贴一个公开 HTTPS 商品链接。服务端优先解析 Open Graph 和
+Product JSON-LD，提取商品名、描述、价格及最多 8 个原图 URL。页面 HTML、图片、
+商品目录和解析结果均不写入数据库，响应完成后即释放。
 
-同步接口使用固定的 SHOPLINE Admin API 版本，并通过 `fields` 只请求商品标识、
-标题、商品路径、订单时间和订单行数量。商品标识只在内存中关联订单，保存前转换为
-SHA-256 哈希。数据库不保存 SKU、图片、订单明细、商品 HTML 或原始 API JSON。
+配置 `OPENAI_API_KEY` 后，可以调用 Responses API 生成 Facebook 文案；模型默认
+为 `gpt-5-mini`，可通过 `OPENAI_MODEL` 覆盖。生成请求设置 `store: false`，文案会
+回填到编辑器，用户仍需选择公共主页并明确确认后才调用 Graph API 发布。
 
-每个商品只保留一条链接索引及 `sales7d`、`salesPrevious7d`、`growthRate` 和
-`hotScore` 聚合值；重复同步使用 Upsert 覆盖，因此不会持续累积订单数据。
+解析器限制 HTTPS、响应大小、超时和重定向次数，并在每次请求前检查 DNS/IP，
+阻止访问本机、内网和云元数据地址。商品页面内容按不可信输入处理。
 
 ## 数据迁移原则
 

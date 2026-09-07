@@ -467,131 +467,100 @@ button:disabled {
   color: #b91c1c;
   border-color: #fecaca;
 }
-.store-settings {
-  overflow: hidden;
-}
-.store-form {
+.product-assistant {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
-  align-items: end;
   gap: 10px;
-  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
 }
-.store-form label {
-  color: #475569;
-  font-size: 11px;
-  font-weight: 700;
-}
-.store-form input {
-  width: 100%;
-  margin-top: 5px;
-  padding: 8px 9px;
-  border: 1px solid #d7dee8;
-  border-radius: 8px;
-  outline: none;
-}
-.store-form input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px #dbeafe;
-}
-.store-list {
-  display: grid;
-  gap: 7px;
-  margin-top: 12px;
-}
-.store-list article {
+.assistant-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px;
-  border: 1px solid #edf1f6;
-  border-radius: 10px;
+  gap: 10px;
 }
-.store-list article > div:first-child {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
+.assistant-heading span,
+.product-fields button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
-.store-list a {
-  overflow: hidden;
-  color: #2563eb;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.assistant-heading span {
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 800;
 }
-.store-list span {
+.assistant-heading small {
   color: #64748b;
   font-size: 10px;
 }
-.store-actions {
-  display: flex;
-  gap: 7px;
-  flex: none;
+.product-link-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
 }
-.store-actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 9px;
+.product-link-form input,
+.product-fields input,
+.product-fields select {
+  width: 100%;
+  padding: 8px 9px;
   border: 1px solid #d7dee8;
   border-radius: 8px;
   background: #fff;
-  color: #334155;
-  font-size: 11px;
-  font-weight: 700;
+  outline: none;
 }
-.store-actions button.danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-}
-.product-table {
-  margin-top: 12px;
-  border: 1px solid #e5eaf1;
-  border-radius: 10px;
-  overflow: hidden;
-}
-.product-row {
+.product-preview {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 90px 90px 80px;
-  align-items: center;
+  grid-template-columns: 132px minmax(0, 1fr);
   gap: 12px;
-  min-height: 48px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #edf1f6;
-  color: #334155;
-  font-size: 12px;
-  text-decoration: none;
+  padding-top: 10px;
+  border-top: 1px solid #dbeafe;
 }
-.product-row:last-child {
-  border-bottom: 0;
+.product-preview > img {
+  width: 132px;
+  height: 132px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: #fff;
 }
-.product-row:not(.product-head):hover {
-  background: #f8fafc;
-}
-.product-row > span:first-child {
+.product-fields {
   display: grid;
-  gap: 3px;
+  gap: 9px;
   min-width: 0;
 }
-.product-row strong,
-.product-row small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.product-fields dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
 }
-.product-row small {
+.product-fields dl div {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 11px;
+}
+.product-fields dt {
   color: #64748b;
 }
-.product-row b {
-  color: #1d4ed8;
+.product-fields dd {
+  max-height: 48px;
+  margin: 0;
+  overflow: auto;
+  color: #1e293b;
 }
-.product-head {
-  min-height: 34px;
-  background: #f8fafc;
-  color: #64748b;
+.product-fields label {
+  display: grid;
+  gap: 4px;
+  color: #475569;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
+}
+.generation-options {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
 }
 .status-card {
   position: absolute;
@@ -842,9 +811,6 @@ button:disabled {
   .toolbar-actions {
     max-width: 52%;
   }
-  .store-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 @media (max-width: 760px) {
   .workspace {
@@ -910,17 +876,15 @@ button:disabled {
     width: 68px;
     height: 60px;
   }
-  .store-form {
+  .product-preview {
     grid-template-columns: 1fr;
   }
-  .store-list article {
-    align-items: flex-start;
-    flex-direction: column;
+  .product-preview > img {
+    width: 100%;
+    height: 180px;
   }
-  .product-table {
-    overflow-x: auto;
-  }
-  .product-row {
-    min-width: 620px;
+  .product-link-form,
+  .generation-options {
+    grid-template-columns: 1fr;
   }
 }

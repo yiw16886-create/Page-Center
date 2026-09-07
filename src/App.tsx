@@ -14,6 +14,7 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Unplug,
   type LucideIcon,
@@ -23,10 +24,9 @@ import {
   api,
   ApiError,
   type MetaStatus,
-  type HotProduct,
   type PluginToken,
   type Post,
-  type StoreConnection,
+  type ProductDraft,
   type User,
 } from "./api";
 
@@ -234,157 +234,112 @@ function PluginAccess() {
   );
 }
 
-function StoreSettings() {
-  const [stores, setStores] = useState<StoreConnection[]>([]);
-  const [name, setName] = useState("");
-  const [handle, setHandle] = useState("");
-  const [publicStoreUrl, setPublicStoreUrl] = useState("");
-  const [accessToken, setAccessToken] = useState("");
+function ProductLinkAssistant({
+  onApply,
+}: {
+  onApply: (message: string, imageUrl: string) => void;
+}) {
+  const [productUrl, setProductUrl] = useState("");
+  const [draft, setDraft] = useState<ProductDraft | null>(null);
+  const [selectedImage, setSelectedImage] = useState("");
+  const [language, setLanguage] = useState("zh-CN");
+  const [tone, setTone] = useState("自然、有吸引力");
   const [busy, setBusy] = useState("");
-  const load = useCallback(() => {
-    void api
-      .stores()
-      .then(setStores)
-      .catch(() => toast.error("读取 SHOPLINE 连接失败"));
-  }, []);
-  useEffect(load, [load]);
 
   return (
-    <section className="panel store-settings">
-      <div className="panel-title">
-        <div>
-          <h2>SHOPLINE 店铺连接</h2>
-          <p>只保存商品链接与销量聚合，不保存 SKU、图片、订单明细或原始 JSON</p>
-        </div>
-        <Plug />
+    <div className="product-assistant">
+      <div className="assistant-heading">
+        <span><Sparkles size={16} /> 商品链接智能草稿</span>
+        <small>临时解析，不写入数据库</small>
       </div>
       <form
-        className="store-form"
+        className="product-link-form"
         onSubmit={(event) => {
           event.preventDefault();
-          setBusy("save");
+          setBusy("parse");
+          setDraft(null);
           void api
-            .saveShopline({ name, handle, publicStoreUrl, accessToken })
-            .then(() => {
-              toast.success("SHOPLINE 连接已保存并验证");
-              setAccessToken("");
-              load();
+            .parseProduct(productUrl)
+            .then((value) => {
+              setDraft(value);
+              setSelectedImage(value.imageUrls[0] || "");
+              toast.success("商品信息解析完成");
             })
             .catch((error) =>
-              toast.error(error instanceof Error ? error.message : "连接失败"),
+              toast.error(error instanceof Error ? error.message : "商品页解析失败"),
             )
             .finally(() => setBusy(""));
         }}
       >
-        <label>
-          店铺名称
-          <input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：美国主站" />
-        </label>
-        <label>
-          SHOPLINE Handle
-          <input required value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="xxx.myshopline.com 中的 xxx" />
-        </label>
-        <label>
-          前台商品域名
-          <input required type="url" value={publicStoreUrl} onChange={(e) => setPublicStoreUrl(e.target.value)} placeholder="https://www.example.com" />
-        </label>
-        <label>
-          Admin API Access Token
-          <input required type="password" minLength={20} autoComplete="off" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} placeholder="需要 read_products、read_orders" />
-        </label>
-        <button className="primary" disabled={!!busy}>
-          {busy === "save" ? "验证中…" : "验证并保存"}
+        <input
+          required
+          type="url"
+          value={productUrl}
+          onChange={(event) => setProductUrl(event.target.value)}
+          placeholder="粘贴公开 HTTPS 商品链接"
+        />
+        <button disabled={!!busy}>
+          {busy === "parse" ? "解析中…" : "1. 解析商品"}
         </button>
       </form>
-      <div className="store-list">
-        {stores.map((store) => (
-          <article key={store.id}>
-            <div>
-              <strong>{store.name}</strong>
-              <a href={store.publicStoreUrl} target="_blank" rel="noreferrer">{store.publicStoreUrl}</a>
-              <span>
-                {store.lastSyncedAt ? `最近同步 ${new Date(store.lastSyncedAt).toLocaleString()}` : "尚未同步"}
-                {store.lastError ? ` · ${store.lastError}` : ""}
-              </span>
+      {draft && (
+        <div className="product-preview">
+          {selectedImage && (
+            <img src={selectedImage} alt={draft.title} referrerPolicy="no-referrer" />
+          )}
+          <div className="product-fields">
+            <dl>
+              <div><dt>商品名</dt><dd>{draft.title}</dd></div>
+              <div><dt>价格</dt><dd>{draft.price || "页面未提供"}</dd></div>
+              <div><dt>描述</dt><dd>{draft.description || "页面未提供"}</dd></div>
+            </dl>
+            {draft.imageUrls.length > 0 && (
+              <label>
+                发布图片
+                <select value={selectedImage} onChange={(event) => setSelectedImage(event.target.value)}>
+                  {draft.imageUrls.map((url, index) => (
+                    <option value={url} key={url}>原图 {index + 1}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="generation-options">
+              <label>
+                语言
+                <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+                  <option value="zh-CN">中文</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+              <label>
+                文案风格
+                <input value={tone} maxLength={80} onChange={(event) => setTone(event.target.value)} />
+              </label>
             </div>
-            <div className="store-actions">
-              <button
-                disabled={!!busy}
-                onClick={() => {
-                  setBusy(store.id);
-                  void api.syncStore(store.id)
-                    .then((result) => toast.success(`已同步 ${result.products} 个商品链接`))
-                    .then(load)
-                    .catch((error) => toast.error(error instanceof Error ? error.message : "同步失败"))
-                    .finally(() => setBusy(""));
-                }}
-              >
-                <RefreshCw size={14} /> {busy === store.id ? "同步中…" : "立即同步"}
-              </button>
-              <button
-                className="danger"
-                disabled={!!busy}
-                onClick={() => {
-                  if (!confirm(`移除店铺“${store.name}”及其商品链接索引？`)) return;
-                  setBusy(store.id);
-                  void api
-                    .disconnectStore(store.id)
-                    .then(() => {
-                      toast.success("店铺连接已移除");
-                      load();
-                    })
-                    .catch((error) =>
-                      toast.error(
-                        error instanceof Error ? error.message : "移除失败",
-                      ),
-                    )
-                    .finally(() => setBusy(""));
-                }}
-              >
-                <Trash2 size={14} /> 移除
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function HotProductsPanel() {
-  const [products, setProducts] = useState<HotProduct[]>([]);
-  const [busy, setBusy] = useState(true);
-  const load = useCallback(() => {
-    setBusy(true);
-    void api
-      .hotProducts()
-      .then(setProducts)
-      .catch(() => toast.error("读取热门商品失败"))
-      .finally(() => setBusy(false));
-  }, []);
-  useEffect(load, [load]);
-  return (
-    <section className="panel widget-full hot-products">
-      <div className="panel-title">
-        <div><h2>热门商品链接</h2><p>最近7天与前7天销量聚合，只展示链接，不加载图片</p></div>
-        <button className="icon-button" aria-label="刷新热门商品" onClick={load} disabled={busy}><RefreshCw size={16} /></button>
-      </div>
-      {products.length ? (
-        <div className="product-table">
-          <div className="product-row product-head"><span>商品</span><span>7天销量</span><span>增长</span><span>热度</span></div>
-          {products.map((product) => (
-            <a className="product-row" key={product.id} href={product.productUrl} target="_blank" rel="noreferrer">
-              <span><strong>{product.title}</strong><small>{product.storeConnection.name} · 查看商品链接</small></span>
-              <span>{product.sales7d}</span>
-              <span>{product.growthRate > 0 ? "+" : ""}{Math.round(product.growthRate * 100)}%</span>
-              <span><b>{product.hotScore.toFixed(1)}</b></span>
-            </a>
-          ))}
+            <button
+              className="primary"
+              disabled={!!busy}
+              onClick={() => {
+                setBusy("generate");
+                void api.generateProductCopy(draft, { language, tone })
+                  .then(({ message }) => {
+                    onApply(message, selectedImage);
+                    toast.success("AI 文案已生成，可继续人工修改");
+                  })
+                  .catch((error) => toast.error(
+                    error instanceof Error && error.message === "OPENAI_NOT_CONFIGURED"
+                      ? "尚未配置 OPENAI_API_KEY"
+                      : error instanceof Error ? error.message : "AI 文案生成失败",
+                  ))
+                  .finally(() => setBusy(""));
+              }}
+            >
+              <Sparkles size={15} /> {busy === "generate" ? "生成中…" : "2. 生成并填入文案"}
+            </button>
+          </div>
         </div>
-      ) : (
-        <Empty icon={BarChart3} title={busy ? "正在读取…" : "暂无热门商品"} detail="请先在设置中连接 SHOPLINE 并执行同步" />
       )}
-    </section>
+    </div>
   );
 }
 
@@ -396,7 +351,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [imageUrl, setImageUrl] = useState("");
   const [busy, setBusy] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "posts" | "publish" | "comments" | "products" | "settings"
+    "posts" | "publish" | "comments" | "settings"
   >("publish");
   const selected = useMemo(
     () => meta?.pages.find((page) => page.pageId === selectedId) || null,
@@ -493,8 +448,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 className={`page-item ${selectedId === page.pageId ? "active" : ""}`}
                 onClick={() => {
                   setSelectedId(page.pageId);
-                  if (activeTab === "settings" || activeTab === "products")
-                    setActiveTab("publish");
+                  if (activeTab === "settings") setActiveTab("publish");
                 }}
               >
                 <span className="avatar">{page.pageName.slice(0, 1)}</span>
@@ -513,12 +467,6 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             )}
           </div>
           <nav className="extension-nav" aria-label="扩展模块">
-            <button
-              className={activeTab === "products" ? "active" : ""}
-              onClick={() => setActiveTab("products")}
-            >
-              <BarChart3 size={16} /> 热门商品
-            </button>
             <button disabled title="即将开放">
               <CalendarClock size={16} /> 自动化规则 <span>即将开放</span>
             </button>
@@ -536,8 +484,6 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               <span className="avatar toolbar-avatar">
                 {activeTab === "settings"
                   ? "设"
-                  : activeTab === "products"
-                    ? "热"
                   : (selected?.pageName || "P").slice(0, 1)}
               </span>
               <div>
@@ -545,11 +491,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <h1>
                     {activeTab === "settings"
                       ? "全局设置"
-                      : activeTab === "products"
-                        ? "热门商品"
                       : selected?.pageName || "公共主页工作台"}
                   </h1>
-                  {activeTab !== "settings" && activeTab !== "products" && (
+                  {activeTab !== "settings" && (
                     <Badge ok={!!selected?.canRead}>
                       {selected?.canRead ? "运行正常" : "等待授权"}
                     </Badge>
@@ -557,16 +501,14 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 </div>
                 <p>
                   {activeTab === "settings"
-                    ? "Meta OAuth、SHOPLINE 与私人插件统一管理"
-                    : activeTab === "products"
-                      ? "SHOPLINE 轻量销量聚合 · 无 SKU 与图片"
+                    ? "Meta OAuth 与私人插件统一管理"
                     : selected
                       ? `ID ${selected.pageId}`
                       : "请选择公共主页"}
                 </p>
               </div>
             </div>
-            {activeTab !== "settings" && activeTab !== "products" && selected && (
+            {activeTab !== "settings" && selected && (
               <div className="toolbar-capabilities">
                 <Badge ok={selected.canRead}>读取</Badge>
                 <Badge ok={selected.canPublish}>发布</Badge>
@@ -575,7 +517,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             )}
           </div>
 
-          {activeTab !== "settings" && activeTab !== "products" && <div className="workspace-tabs" role="tablist" aria-label="主页工作区">
+          {activeTab !== "settings" && <div className="workspace-tabs" role="tablist" aria-label="主页工作区">
             <button
               role="tab"
               aria-selected={activeTab === "posts"}
@@ -681,13 +623,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 <div className="widget-secondary">
                   <PluginAccess />
                 </div>
-                <div className="widget-full">
-                  <StoreSettings />
-                </div>
               </>
             )}
-
-            {activeTab === "products" && <HotProductsPanel />}
 
             {activeTab === "publish" && (
               <section className="panel composer widget-primary">
@@ -698,6 +635,12 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   </div>
                   <Send />
                 </div>
+                <ProductLinkAssistant
+                  onApply={(generatedMessage, generatedImage) => {
+                    setMessage(generatedMessage);
+                    setImageUrl(generatedImage);
+                  }}
+                />
                 <textarea
                   placeholder="写下要发布到公共主页的内容…"
                   value={message}
@@ -813,7 +756,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               </section>
             )}
 
-            {activeTab !== "settings" && activeTab !== "products" && <section className="panel widget-secondary overview-widget">
+            {activeTab !== "settings" && <section className="panel widget-secondary overview-widget">
               <div className="panel-title">
                 <div>
                   <h2>主页能力</h2>
