@@ -249,6 +249,11 @@ aside {
   color: #94a3b8;
   font-size: 9px;
 }
+.extension-nav button:not(:disabled):hover,
+.extension-nav button.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
 .content {
   padding: 12px 16px 20px;
   max-width: 1500px;
@@ -275,6 +280,11 @@ aside {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+.toolbar-capabilities {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .toolbar-avatar {
   width: 34px;
@@ -367,6 +377,95 @@ button:disabled {
 .status-dot.online {
   background: #22c55e;
   box-shadow: 0 0 0 3px #dcfce7;
+}
+.oauth-settings {
+  min-height: 310px;
+}
+.connection-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+.connection-summary > div {
+  display: grid;
+  gap: 3px;
+}
+.connection-summary strong {
+  font-size: 13px;
+}
+.connection-summary span {
+  color: #64748b;
+  font-size: 11px;
+}
+.connection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #e9eef5;
+  color: #64748b !important;
+  font-weight: 800;
+}
+.connection-pill.online {
+  background: #dcfce7;
+  color: #15803d !important;
+}
+.connection-pill.online .status-dot {
+  background: #22c55e;
+}
+.oauth-facts {
+  display: grid;
+  gap: 0;
+  margin: 12px 0;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+}
+.oauth-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border-bottom: 1px solid #edf1f6;
+  font-size: 11px;
+}
+.oauth-facts div:last-child {
+  border-bottom: 0;
+}
+.oauth-facts dt {
+  color: #64748b;
+}
+.oauth-facts dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.settings-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #d7dee8;
+  border-radius: 9px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+.settings-actions button.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
 }
 .status-card {
   position: absolute;

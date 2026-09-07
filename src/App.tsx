@@ -3,7 +3,6 @@ import {
   BarChart3,
   CalendarClock,
   Check,
-  ChevronDown,
   Copy,
   ExternalLink,
   FileText,
@@ -240,9 +239,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [busy, setBusy] = useState("");
-  const [activeTab, setActiveTab] = useState<"posts" | "publish" | "comments">(
-    "publish",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "posts" | "publish" | "comments" | "settings"
+  >("publish");
   const selected = useMemo(
     () => meta?.pages.find((page) => page.pageId === selectedId) || null,
     [meta, selectedId],
@@ -336,7 +335,10 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               <button
                 key={page.pageId}
                 className={`page-item ${selectedId === page.pageId ? "active" : ""}`}
-                onClick={() => setSelectedId(page.pageId)}
+                onClick={() => {
+                  setSelectedId(page.pageId);
+                  if (activeTab === "settings") setActiveTab("publish");
+                }}
               >
                 <span className="avatar">{page.pageName.slice(0, 1)}</span>
                 <span>
@@ -360,8 +362,11 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             <button disabled title="即将开放">
               <CalendarClock size={16} /> 自动化规则 <span>即将开放</span>
             </button>
-            <button disabled title="即将开放">
-              <Settings size={16} /> 设置 <span>即将开放</span>
+            <button
+              className={activeTab === "settings" ? "active" : ""}
+              onClick={() => setActiveTab("settings")}
+            >
+              <Settings size={16} /> 设置
             </button>
           </nav>
         </aside>
@@ -369,107 +374,42 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           <div className="page-toolbar">
             <div className="page-identity">
               <span className="avatar toolbar-avatar">
-                {(selected?.pageName || "P").slice(0, 1)}
+                {activeTab === "settings"
+                  ? "设"
+                  : (selected?.pageName || "P").slice(0, 1)}
               </span>
               <div>
                 <div className="identity-line">
-                  <h1>{selected?.pageName || "公共主页工作台"}</h1>
-                  <Badge ok={!!selected?.canRead}>
-                    {selected?.canRead ? "运行正常" : "等待授权"}
-                  </Badge>
+                  <h1>
+                    {activeTab === "settings"
+                      ? "全局设置"
+                      : selected?.pageName || "公共主页工作台"}
+                  </h1>
+                  {activeTab !== "settings" && (
+                    <Badge ok={!!selected?.canRead}>
+                      {selected?.canRead ? "运行正常" : "等待授权"}
+                    </Badge>
+                  )}
                 </div>
                 <p>
-                  {selected ? `ID ${selected.pageId}` : "请选择或连接公共主页"}
+                  {activeTab === "settings"
+                    ? "Meta OAuth 与私人插件统一管理"
+                    : selected
+                      ? `ID ${selected.pageId}`
+                      : "请选择公共主页"}
                 </p>
               </div>
             </div>
-            <div className="toolbar-actions">
-              <details className="status-popover">
-                <summary>
-                  <span
-                    className={`status-dot ${meta?.connected ? "online" : ""}`}
-                  />
-                  {meta?.connected ? "Meta 已连接" : "Meta 未连接"}
-                  <ChevronDown size={14} />
-                </summary>
-                <div className="status-card">
-                  <strong>授权状态</strong>
-                  <dl>
-                    <div>
-                      <dt>Meta 账号</dt>
-                      <dd>{meta?.facebookUserName || "未连接"}</dd>
-                    </div>
-                    <div>
-                      <dt>最近校验</dt>
-                      <dd>
-                        {meta?.lastVerifiedAt
-                          ? new Date(meta.lastVerifiedAt).toLocaleString()
-                          : "—"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Token</dt>
-                      <dd>服务端加密</dd>
-                    </div>
-                  </dl>
-                </div>
-              </details>
-              <button
-                className="primary"
-                disabled={!!busy}
-                onClick={() =>
-                  void act("connect", async () => {
-                    const { url } = await api.connect();
-                    window.open(
-                      url,
-                      "meta-page-oauth",
-                      "popup,width=640,height=760",
-                    );
-                  })
-                }
-              >
-                <ExternalLink size={16} />
-                {meta?.connected ? "重新授权" : "连接 Meta"}
-              </button>
-              {meta?.connected && (
-                <>
-                  <button
-                    disabled={!!busy}
-                    onClick={() =>
-                      void act("verify", async () => {
-                        await api.verify();
-                        await reloadMeta();
-                        toast.success("授权已校验");
-                      })
-                    }
-                  >
-                    <RefreshCw size={16} />
-                    校验
-                  </button>
-                  <button
-                    className="danger compact-danger"
-                    disabled={!!busy}
-                    onClick={() => {
-                      if (confirm("断开当前账号的 Meta 授权？"))
-                        void act("disconnect", async () => {
-                          await api.disconnect();
-                          await reloadMeta();
-                        });
-                    }}
-                  >
-                    <Unplug size={16} />
-                    断开
-                  </button>
-                </>
-              )}
-            </div>
+            {activeTab !== "settings" && selected && (
+              <div className="toolbar-capabilities">
+                <Badge ok={selected.canRead}>读取</Badge>
+                <Badge ok={selected.canPublish}>发布</Badge>
+                <Badge ok={selected.canManageComments}>评论</Badge>
+              </div>
+            )}
           </div>
 
-          <div
-            className="workspace-tabs"
-            role="tablist"
-            aria-label="主页工作区"
-          >
+          {activeTab !== "settings" && <div className="workspace-tabs" role="tablist" aria-label="主页工作区">
             <button
               role="tab"
               aria-selected={activeTab === "posts"}
@@ -495,9 +435,89 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               <MessageSquareText size={15} /> 管理评论
               <span className="beta-tag">预留</span>
             </button>
-          </div>
+          </div>}
 
           <div className="bento-grid">
+            {activeTab === "settings" && (
+              <>
+                <section className="panel oauth-settings widget-primary">
+                  <div className="panel-title">
+                    <div>
+                      <h2>Meta OAuth 全局连接</h2>
+                      <p>一次授权同步并控制当前账号可管理的全部公共主页</p>
+                    </div>
+                    <KeyRound />
+                  </div>
+                  <div className="connection-summary">
+                    <span className={`connection-pill ${meta?.connected ? "online" : ""}`}>
+                      <span className="status-dot" />
+                      {meta?.connected ? "已连接" : "未连接"}
+                    </span>
+                    <div>
+                      <strong>{meta?.facebookUserName || "尚未连接 Meta 账号"}</strong>
+                      <span>
+                        {meta?.lastVerifiedAt
+                          ? `最近校验 ${new Date(meta.lastVerifiedAt).toLocaleString()}`
+                          : "完成授权后会自动同步公共主页"}
+                      </span>
+                    </div>
+                  </div>
+                  <dl className="oauth-facts">
+                    <div><dt>授权范围</dt><dd>账号下全部已授权公共主页</dd></div>
+                    <div><dt>已同步主页</dt><dd>{meta?.pages.length || 0} 个</dd></div>
+                    <div><dt>Token 存储</dt><dd>服务端加密</dd></div>
+                  </dl>
+                  <div className="settings-actions">
+                    <button
+                      className="primary"
+                      disabled={!!busy}
+                      onClick={() =>
+                        void act("connect", async () => {
+                          const { url } = await api.connect();
+                          window.open(url, "meta-page-oauth", "popup,width=640,height=760");
+                        })
+                      }
+                    >
+                      <ExternalLink size={16} />
+                      {meta?.connected ? "重新授权" : "连接 Meta"}
+                    </button>
+                    {meta?.connected && (
+                      <>
+                        <button
+                          disabled={!!busy}
+                          onClick={() =>
+                            void act("verify", async () => {
+                              await api.verify();
+                              await reloadMeta();
+                              toast.success("授权已校验");
+                            })
+                          }
+                        >
+                          <RefreshCw size={16} /> 校验授权
+                        </button>
+                        <button
+                          className="danger"
+                          disabled={!!busy}
+                          onClick={() => {
+                            if (confirm("断开当前账号的 Meta 授权？"))
+                              void act("disconnect", async () => {
+                                await api.disconnect();
+                                await reloadMeta();
+                              });
+                          }}
+                        >
+                          <Unplug size={16} /> 断开
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </section>
+                <div className="widget-secondary">
+                  <PluginAccess />
+                </div>
+              </>
+            )}
+
             {activeTab === "publish" && (
               <section className="panel composer widget-primary">
                 <div className="panel-title">
@@ -622,7 +642,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               </section>
             )}
 
-            <section className="panel widget-secondary overview-widget">
+            {activeTab !== "settings" && <section className="panel widget-secondary overview-widget">
               <div className="panel-title">
                 <div>
                   <h2>主页能力</h2>
@@ -649,11 +669,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <span>扩展组件预留位</span>
                 </div>
               </div>
-            </section>
-
-            <div className="widget-full">
-              <PluginAccess />
-            </div>
+            </section>}
           </div>
         </section>
       </main>

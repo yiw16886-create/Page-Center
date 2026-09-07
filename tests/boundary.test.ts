@@ -144,7 +144,8 @@ test("Page Center dashboard keeps a pluggable high-density UI shell", () => {
   assert.match(app, /读取帖子/);
   assert.match(app, /发布帖子/);
   assert.match(app, /管理评论/);
-  assert.match(app, /status-popover/);
+  assert.match(app, /Meta OAuth 全局连接/);
+  assert.match(app, /activeTab === "settings"/);
   assert.match(app, /extension-nav/);
   assert.match(
     styles,
@@ -152,4 +153,15 @@ test("Page Center dashboard keeps a pluggable high-density UI shell", () => {
   );
   assert.match(styles, /\.widget-primary\s*{[^}]*grid-column:\s*span 8/);
   assert.match(styles, /\.widget-secondary\s*{[^}]*grid-column:\s*span 4/);
+});
+
+test("OAuth and private plugin controls live in global settings", () => {
+  const app = read("src/App.tsx");
+  const settingsStart = app.indexOf('activeTab === "settings"');
+  const oauthStart = app.indexOf("Meta OAuth 全局连接");
+  const pluginStart = app.lastIndexOf("<PluginAccess />");
+  assert.ok(settingsStart >= 0);
+  assert.ok(oauthStart > settingsStart);
+  assert.ok(pluginStart > oauthStart);
+  assert.match(app, /一次授权同步并控制当前账号可管理的全部公共主页/);
 });
