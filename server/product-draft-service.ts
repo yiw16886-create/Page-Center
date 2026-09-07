@@ -341,9 +341,12 @@ function outputText(body: any) {
 export function resolveAiRuntime(
   env: NodeJS.ProcessEnv = process.env,
   requestedModel?: string,
+  configuredGatewayToken?: string,
 ) {
   const gatewayToken =
-    env.AI_GATEWAY_API_KEY?.trim() || env.VERCEL_OIDC_TOKEN?.trim();
+    configuredGatewayToken?.trim() ||
+    env.AI_GATEWAY_API_KEY?.trim() ||
+    env.VERCEL_OIDC_TOKEN?.trim();
   const openAiToken = env.OPENAI_API_KEY?.trim();
   const gateway = Boolean(gatewayToken);
   const configuredModel =
@@ -369,9 +372,18 @@ export function resolveAiRuntime(
 
 export async function generateFacebookCopy(
   draft: ProductDraft,
-  options: { language?: string; tone?: string; model?: string } = {},
+  options: {
+    language?: string;
+    tone?: string;
+    model?: string;
+    gatewayToken?: string;
+  } = {},
 ) {
-  const runtime = resolveAiRuntime(process.env, options.model);
+  const runtime = resolveAiRuntime(
+    process.env,
+    options.model,
+    options.gatewayToken,
+  );
   if (!runtime.token) throw new Error("AI_NOT_CONFIGURED");
   if (!runtime.gateway && options.model && !options.model.startsWith("openai/"))
     throw new Error("AI_MODEL_REQUIRES_GATEWAY");
@@ -422,8 +434,9 @@ export async function generateFacebookCopy(
 export async function generateFacebookImage(
   draft: ProductDraft,
   model: string,
+  gatewayToken?: string,
 ) {
-  const runtime = resolveAiRuntime();
+  const runtime = resolveAiRuntime(process.env, model, gatewayToken);
   if (!runtime.token) throw new Error("AI_NOT_CONFIGURED");
   if (!runtime.gateway) throw new Error("AI_IMAGE_REQUIRES_GATEWAY");
   const response = await fetch(

@@ -184,6 +184,17 @@ test("product-link drafts are ephemeral and replace the SHOPLINE catalog", () =>
   assert.doesNotMatch(routes, /\/stores\/shopline|\/products\/hot/);
 });
 
+test("custom AI Gateway tokens are encrypted and never returned to the browser", () => {
+  const schema = read("prisma/schema.prisma");
+  const settings = read("server/ai-settings.ts");
+  const api = read("src/api.ts");
+  assert.match(schema, /aiGatewayTokenCiphertext\s+String\?/);
+  assert.match(settings, /encryptToken/);
+  assert.match(settings, /decryptToken/);
+  assert.match(settings, /hasToken: Boolean/);
+  assert.doesNotMatch(api, /aiGatewayTokenCiphertext/);
+});
+
 test("AI generation remains opt-in and generated images are not persisted", () => {
   const app = read("src/App.tsx");
   const routes = read("server/routes.ts");

@@ -479,7 +479,11 @@ button:disabled {
   font-size: 11px;
   font-weight: 700;
 }
-.ai-model-grid select {
+.ai-model-grid .ai-token-field {
+  grid-column: 1 / -1;
+}
+.ai-model-grid select,
+.ai-model-grid input {
   width: 100%;
   padding: 9px 10px;
   border: 1px solid #d7dee8;

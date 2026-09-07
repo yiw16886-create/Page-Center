@@ -1,24 +1,16 @@
 import prisma from "./db.js";
+import { decryptToken, encryptToken } from "./token-cipher.js";
 
-export const TEXT_MODELS = [
-  { id: "openai/gpt-5-mini", label: "GPT-5 mini（快速）" },
-  { id: "openai/gpt-5.4", label: "GPT-5.4（高质量）" },
-  { id: "anthropic/claude-sonnet-5", label: "Claude Sonnet 5" },
-] as const;
-
-export const IMAGE_MODELS = [
-  { id: "bfl/flux-2-pro", label: "Flux 2 Pro（推荐）" },
-  { id: "openai/gpt-image-2", label: "GPT Image 2" },
-  { id: "openai/gpt-image-1-mini", label: "GPT Image 1 Mini（经济）" },
-] as const;
-
-const textIds = new Set<string>(TEXT_MODELS.map(({ id }) => id));
-const imageIds = new Set<string>(IMAGE_MODELS.map(({ id }) => id));
+const GATEWAY_MODEL_ID = /^[a-z0-9][a-z0-9._-]{0,63}\/[a-z0-9][a-z0-9._:-]{0,127}$/i;
 
 export function validateAiModels(textModel: string, imageModel: string) {
-  if (!textIds.has(textModel)) throw new Error("AI_TEXT_MODEL_INVALID");
-  if (!imageIds.has(imageModel)) throw new Error("AI_IMAGE_MODEL_INVALID");
-  return { textModel, imageModel };
+  const normalizedText = textModel.trim();
+  const normalizedImage = imageModel.trim();
+  if (!GATEWAY_MODEL_ID.test(normalizedText))
+    throw new Error("AI_TEXT_MODEL_INVALID");
+  if (!GATEWAY_MODEL_ID.test(normalizedImage))
+    throw new Error("AI_IMAGE_MODEL_INVALID");
+  return { textModel: normalizedText, imageModel: normalizedImage };
 }
 
 export function aiPreferenceData(textModel: string, imageModel: string) {
@@ -32,22 +24,61 @@ export function aiPreferenceData(textModel: string, imageModel: string) {
 export async function getAiSettings(userId: number) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { aiTextModel: true, aiImageModel: true },
+    select: {
+      aiTextModel: true,
+      aiImageModel: true,
+      aiGatewayTokenCiphertext: true,
+    },
   });
   if (!user) throw new Error("USER_INACTIVE");
   return {
-    ...user,
-    textModels: TEXT_MODELS,
-    imageModels: IMAGE_MODELS,
+    aiTextModel: user.aiTextModel,
+    aiImageModel: user.aiImageModel,
+    hasToken: Boolean(user.aiGatewayTokenCiphertext),
   };
+}
+
+export async function getAiRuntimeSettings(userId: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      aiTextModel: true,
+      aiImageModel: true,
+      aiGatewayTokenCiphertext: true,
+    },
+  });
+  if (!user) throw new Error("USER_INACTIVE");
+  return {
+    aiTextModel: user.aiTextModel,
+    aiImageModel: user.aiImageModel,
+    gatewayToken: user.aiGatewayTokenCiphertext
+      ? decryptToken(user.aiGatewayTokenCiphertext)
+      : undefined,
+  };
+}
+
+export function validateGatewayToken(token: string) {
+  const value = token.trim();
+  if (value.length < 12 || value.length > 4096 || /\s/.test(value))
+    throw new Error("AI_GATEWAY_TOKEN_INVALID");
+  return value;
 }
 
 export async function saveAiSettings(
   userId: number,
   textModel: string,
   imageModel: string,
+  token?: string,
+  clearToken = false,
 ) {
-  const data = aiPreferenceData(textModel, imageModel);
+  const data: {
+    aiTextModel: string;
+    aiImageModel: string;
+    aiGatewayTokenCiphertext?: string | null;
+  } = aiPreferenceData(textModel, imageModel);
+  if (clearToken) data.aiGatewayTokenCiphertext = null;
+  else if (token?.trim())
+    data.aiGatewayTokenCiphertext = encryptToken(validateGatewayToken(token));
   await prisma.user.update({ where: { id: userId }, data });
   return getAiSettings(userId);
 }

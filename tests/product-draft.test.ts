@@ -57,6 +57,17 @@ test("keeps direct OpenAI as a local compatibility fallback", () => {
   assert.equal(runtime.model, "gpt-5-mini");
 });
 
+test("an account Gateway token takes priority over deployment credentials", () => {
+  const runtime = resolveAiRuntime(
+    { VERCEL_OIDC_TOKEN: "deployment-token" } as NodeJS.ProcessEnv,
+    "anthropic/claude-sonnet-5",
+    "account-token",
+  );
+  assert.equal(runtime.gateway, true);
+  assert.equal(runtime.token, "account-token");
+  assert.equal(runtime.model, "anthropic/claude-sonnet-5");
+});
+
 test("extracts a blocked storefront through the reader compatibility payload", () => {
   const draft = extractProductFromReader(
     {

@@ -394,6 +394,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [imageUrl, setImageUrl] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState("");
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
+  const [aiGatewayToken, setAiGatewayToken] = useState("");
   const [busy, setBusy] = useState("");
   const [activeTab, setActiveTab] = useState<
     "posts" | "publish" | "comments" | "settings"
@@ -677,39 +678,51 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <section className="panel ai-settings widget-primary">
                     <div className="panel-title">
                       <div>
-                        <h2>AI 模型设置</h2>
-                        <p>全局默认模型；只有点击 AI 按钮时才会调用并计费</p>
+                        <h2>AI 连接与模型</h2>
+                        <p>
+                          {aiSettings.hasToken ? "自定义 Token 已连接" : "尚未配置自定义 Token"}
+                          ；只有点击 AI 按钮时才会调用并计费
+                        </p>
                       </div>
                       <Sparkles />
                     </div>
                     <div className="ai-model-grid">
                       <label>
-                        文案模型
-                        <select
+                        文案模型 ID
+                        <input
                           value={aiSettings.aiTextModel}
+                          maxLength={193}
+                          placeholder="openai/gpt-5-mini"
                           onChange={(event) => setAiSettings({
                             ...aiSettings,
                             aiTextModel: event.target.value,
                           })}
-                        >
-                          {aiSettings.textModels.map((model) => (
-                            <option key={model.id} value={model.id}>{model.label}</option>
-                          ))}
-                        </select>
+                        />
                       </label>
                       <label>
-                        图片模型
-                        <select
+                        图片模型 ID
+                        <input
                           value={aiSettings.aiImageModel}
+                          maxLength={193}
+                          placeholder="bfl/flux-2-pro"
                           onChange={(event) => setAiSettings({
                             ...aiSettings,
                             aiImageModel: event.target.value,
                           })}
-                        >
-                          {aiSettings.imageModels.map((model) => (
-                            <option key={model.id} value={model.id}>{model.label}</option>
-                          ))}
-                        </select>
+                        />
+                      </label>
+                      <label className="ai-token-field">
+                        AI Gateway Token
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          value={aiGatewayToken}
+                          maxLength={4096}
+                          placeholder={aiSettings.hasToken
+                            ? "已安全保存；留空不会更换"
+                            : "粘贴你的 Vercel AI Gateway Token"}
+                          onChange={(event) => setAiGatewayToken(event.target.value)}
+                        />
                       </label>
                     </div>
                     <div className="settings-actions">
@@ -720,13 +733,36 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           const saved = await api.saveAiSettings(
                             aiSettings.aiTextModel,
                             aiSettings.aiImageModel,
+                            { token: aiGatewayToken || undefined },
                           );
                           setAiSettings(saved);
-                          toast.success("AI 模型设置已保存");
+                          setAiGatewayToken("");
+                          toast.success("AI 连接与模型设置已保存");
                         })}
                       >
-                        <Check size={16} /> 保存模型设置
+                        <Check size={16} /> 保存 AI 设置
                       </button>
+                      {aiSettings.hasToken && (
+                        <button
+                          className="danger"
+                          disabled={!!busy}
+                          onClick={() => {
+                            if (confirm("删除已保存的 AI Gateway Token？"))
+                              void act("ai-token-delete", async () => {
+                                const saved = await api.saveAiSettings(
+                                  aiSettings.aiTextModel,
+                                  aiSettings.aiImageModel,
+                                  { clearToken: true },
+                                );
+                                setAiSettings(saved);
+                                setAiGatewayToken("");
+                                toast.success("自定义 AI Token 已删除");
+                              });
+                          }}
+                        >
+                          <Trash2 size={16} /> 删除 Token
+                        </button>
+                      )}
                     </div>
                   </section>
                 )}

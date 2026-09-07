@@ -46,15 +46,16 @@ Meta App 的 Valid OAuth Redirect URI 必须与 `META_REDIRECT_URI` 完全一致
 Product JSON-LD，提取商品名、描述、价格及最多 8 个原图 URL。页面 HTML、图片、
 商品目录和解析结果均不写入数据库，响应完成后即释放。
 
-Vercel 生产环境优先使用自动注入的 OIDC Token 调用 AI Gateway，无需保存静态
-OpenAI 密钥；模型默认为 `openai/gpt-5-mini`，可通过 `AI_MODEL` 覆盖。本地或
-非 Vercel 环境可配置 `AI_GATEWAY_API_KEY`，也可继续使用 `OPENAI_API_KEY` 直接
-调用 OpenAI 作为兼容后备。生成请求关闭存储并禁止将提示用于训练，文案会回填到
-编辑器，用户仍需选择公共主页并明确确认后才调用 Graph API 发布。
+用户可在“设置 → AI 连接与模型”保存自己的 Vercel AI Gateway Token；Token 使用
+AES-256-GCM 加密并仅在服务端解密，浏览器只能看到是否已连接。账号 Token 的优先级
+高于 Vercel 自动注入的 OIDC Token 和部署环境中的 `AI_GATEWAY_API_KEY`。本地环境
+也可继续使用 `OPENAI_API_KEY` 直接调用 OpenAI 作为兼容后备。生成请求关闭存储并
+禁止将提示用于训练，文案会回填到编辑器，用户仍需选择公共主页并明确确认后才调用
+Graph API 发布。
 
 AI 是发布区内的可选动作：解析商品后可以分别选择“使用原图”“AI 文案”或
-“AI 配图”，未点击时不会调用相应模型。“设置 → AI 模型设置”分别保存账号级
-文案模型和图片模型，并由服务端白名单限制可用值。AI 配图只在当前浏览器草稿中
+“AI 配图”，未点击时不会调用相应模型。“设置 → AI 连接与模型”允许按 Gateway
+的 `provider/model` 格式自由填写账号级文案模型和图片模型。AI 配图只在当前浏览器草稿中
 短暂存在，确认后以二进制直接上传 Meta；数据库只保存两个模型 ID，不保存草稿、
 图片、Base64 或商品内容。
 

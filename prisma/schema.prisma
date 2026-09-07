@@ -9,21 +9,22 @@ datasource db {
 }
 
 model User {
-  id             Int              @id @default(autoincrement())
-  email          String           @unique
-  passwordHash   String
-  status         String           @default("ACTIVE")
-  aiTextModel    String           @default("openai/gpt-5-mini")
-  aiImageModel   String           @default("bfl/flux-2-pro")
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  authorization  MetaAuthorization?
-  pages          AuthorizedPage[]
-  actionLogs     ActionLog[]
-  actionReceipts ActionReceipt[]
-  pluginTokens   PluginAccessToken[]
-  oauthCodes     OAuthAuthorizationCode[]
-  oauthTokens    OAuthAccessToken[]
+  id                       Int                      @id @default(autoincrement())
+  email                    String                   @unique
+  passwordHash             String
+  status                   String                   @default("ACTIVE")
+  aiTextModel              String                   @default("openai/gpt-5-mini")
+  aiImageModel             String                   @default("bfl/flux-2-pro")
+  aiGatewayTokenCiphertext String?                  @db.Text
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  authorization            MetaAuthorization?
+  pages                    AuthorizedPage[]
+  actionLogs               ActionLog[]
+  actionReceipts           ActionReceipt[]
+  pluginTokens             PluginAccessToken[]
+  oauthCodes               OAuthAuthorizationCode[]
+  oauthTokens              OAuthAccessToken[]
 }
 
 model PluginAccessToken {
@@ -103,7 +104,7 @@ model MetaAuthorization {
   authorizedAt        DateTime  @default(now())
   lastVerifiedAt      DateTime?
   updatedAt           DateTime  @updatedAt
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuthorizedPage {
@@ -121,7 +122,7 @@ model AuthorizedPage {
   authorizedAt        DateTime  @default(now())
   lastVerifiedAt      DateTime?
   updatedAt           DateTime  @updatedAt
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, pageId])
   @@index([userId, status])

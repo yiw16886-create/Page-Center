@@ -71,8 +71,7 @@ export type ProductDraft = {
 export type AiSettings = {
   aiTextModel: string;
   aiImageModel: string;
-  textModels: ReadonlyArray<{ id: string; label: string }>;
-  imageModels: ReadonlyArray<{ id: string; label: string }>;
+  hasToken: boolean;
 };
 
 export const api = {
@@ -109,11 +108,15 @@ export const api = {
       headers,
     }),
   aiSettings: () => request<AiSettings>("/api/settings/ai"),
-  saveAiSettings: (textModel: string, imageModel: string) =>
+  saveAiSettings: (
+    textModel: string,
+    imageModel: string,
+    options: { token?: string; clearToken?: boolean } = {},
+  ) =>
     request<AiSettings>("/api/settings/ai", {
       method: "PUT",
       headers,
-      body: JSON.stringify({ textModel, imageModel }),
+      body: JSON.stringify({ textModel, imageModel, ...options }),
     }),
   parseProduct: (url: string) =>
     request<ProductDraft>("/api/product-drafts/parse", {

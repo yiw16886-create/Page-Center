@@ -1,30 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  IMAGE_MODELS,
-  TEXT_MODELS,
   aiPreferenceData,
   validateAiModels,
+  validateGatewayToken,
 } from "../server/ai-settings.js";
 
-test("AI settings expose separate allowlists for copy and image models", () => {
-  assert.ok(TEXT_MODELS.some(({ id }) => id === "openai/gpt-5-mini"));
-  assert.ok(IMAGE_MODELS.some(({ id }) => id === "bfl/flux-2-pro"));
+test("AI settings accept custom Gateway model IDs", () => {
   assert.deepEqual(
-    validateAiModels("openai/gpt-5.4", "openai/gpt-image-2"),
-    { textModel: "openai/gpt-5.4", imageModel: "openai/gpt-image-2" },
+    validateAiModels(" anthropic/claude-sonnet-5 ", "openai/gpt-image-2"),
+    { textModel: "anthropic/claude-sonnet-5", imageModel: "openai/gpt-image-2" },
   );
 });
 
-test("AI settings reject browser-supplied models outside the allowlist", () => {
+test("AI settings reject malformed Gateway model IDs", () => {
   assert.throws(
-    () => validateAiModels("unknown/text", "bfl/flux-2-pro"),
+    () => validateAiModels("missing-provider", "bfl/flux-2-pro"),
     /AI_TEXT_MODEL_INVALID/,
   );
   assert.throws(
-    () => validateAiModels("openai/gpt-5-mini", "unknown/image"),
+    () => validateAiModels("openai/gpt-5-mini", "https:\/\/example.com/model"),
     /AI_IMAGE_MODEL_INVALID/,
   );
+});
+
+test("AI Gateway tokens are validated without assuming a provider prefix", () => {
+  assert.equal(validateGatewayToken("  custom-private-token-123  "), "custom-private-token-123");
+  assert.throws(() => validateGatewayToken("short"), /AI_GATEWAY_TOKEN_INVALID/);
+  assert.throws(() => validateGatewayToken("token with spaces"), /AI_GATEWAY_TOKEN_INVALID/);
 });
 
 test("AI settings map API names to the Prisma user fields", () => {
