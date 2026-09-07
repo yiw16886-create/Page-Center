@@ -14,6 +14,7 @@
 - AES-256-GCM 加密保存用户 Token 和 Page Token
 - 私人 MCP 插件：OAuth 2.1 登录、列出主页、读取帖子、确认后发布帖子
 - 独立、可撤销的插件访问 Token（数据库只保存 SHA-256 哈希）
+- SHOPLINE 轻量商品链接同步与近 7 天热门评分
 
 ## 本地启动
 
@@ -38,6 +39,18 @@ Meta App 的 Valid OAuth Redirect URI 必须与 `META_REDIRECT_URI` 完全一致
 - `pages_manage_metadata`
 
 应用仍处于 Development 模式时，只有 App 角色内的账号可以完成授权。
+
+## SHOPLINE 轻量商品索引
+
+在“设置”中连接 SHOPLINE，需要一个具有 `read_products` 和 `read_orders`
+权限的 Admin API Access Token、店铺 Handle 和公开商品域名。
+
+同步接口使用固定的 SHOPLINE Admin API 版本，并通过 `fields` 只请求商品标识、
+标题、商品路径、订单时间和订单行数量。商品标识只在内存中关联订单，保存前转换为
+SHA-256 哈希。数据库不保存 SKU、图片、订单明细、商品 HTML 或原始 API JSON。
+
+每个商品只保留一条链接索引及 `sales7d`、`salesPrevious7d`、`growthRate` 和
+`hotScore` 聚合值；重复同步使用 Upsert 覆盖，因此不会持续累积订单数据。
 
 ## 数据迁移原则
 

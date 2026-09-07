@@ -23,6 +23,13 @@ import {
   listPluginTokens,
   revokePluginToken,
 } from "./plugin-token-service.js";
+import {
+  disconnectStore,
+  listHotProducts,
+  listStoreConnections,
+  saveShoplineConnection,
+  syncShopline,
+} from "./shopline-service.js";
 
 const router = Router();
 const asyncRoute =
@@ -110,6 +117,64 @@ router.delete(
     await revokePluginToken(req.actor!.id, req.params.tokenId);
     res.json({ success: true });
   }),
+);
+router.get(
+  "/stores",
+  asyncRoute(async (req: AuthenticatedRequest, res) =>
+    res.json({
+      success: true,
+      data: await listStoreConnections(req.actor!.id),
+    }),
+  ),
+);
+router.post(
+  "/stores/shopline",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) =>
+    res.json({
+      success: true,
+      data: await saveShoplineConnection(req.actor!.id, {
+        name: String(req.body?.name || ""),
+        handle: String(req.body?.handle || ""),
+        publicStoreUrl: String(req.body?.publicStoreUrl || ""),
+        accessToken: String(req.body?.accessToken || ""),
+      }),
+    }),
+  ),
+);
+router.post(
+  "/stores/:connectionId/sync",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) =>
+    res.json({
+      success: true,
+      data: await syncShopline(req.actor!.id, req.params.connectionId),
+    }),
+  ),
+);
+router.delete(
+  "/stores/:connectionId",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) => {
+    await disconnectStore(req.actor!.id, req.params.connectionId);
+    res.json({ success: true });
+  }),
+);
+router.get(
+  "/products/hot",
+  asyncRoute(async (req: AuthenticatedRequest, res) =>
+    res.json({
+      success: true,
+      data: await listHotProducts(req.actor!.id, {
+        storeId:
+          typeof req.query.storeId === "string" ? req.query.storeId : undefined,
+        limit:
+          typeof req.query.limit === "string"
+            ? Number(req.query.limit)
+            : undefined,
+      }),
+    }),
+  ),
 );
 router.get(
   "/meta/status",

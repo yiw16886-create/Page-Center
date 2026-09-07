@@ -165,3 +165,20 @@ test("OAuth and private plugin controls live in global settings", () => {
   assert.ok(pluginStart > oauthStart);
   assert.match(app, /一次授权同步并控制当前账号可管理的全部公共主页/);
 });
+
+test("SHOPLINE product index stores links and aggregates but no SKU or images", () => {
+  const schema = read("prisma/schema.prisma");
+  const service = read("server/shopline-service.ts");
+  const routes = read("server/routes.ts");
+  assert.match(schema, /model StoreConnection/);
+  assert.match(schema, /model ProductLink/);
+  assert.match(schema, /productUrl\s+String/);
+  assert.match(schema, /sales7d\s+Int/);
+  assert.doesNotMatch(schema, /\bsku\b/i);
+  assert.doesNotMatch(schema, /imageUrl|imageData|rawOrder|rawJson/i);
+  assert.match(service, /fields: "id,title,path,handle,status"/);
+  assert.match(service, /fields: "order_at,created_at,financial_status,status,cancelled_at,line_items"/);
+  assert.doesNotMatch(service, /\.sku\b|\.images\b|\.media\b/);
+  assert.match(routes, /\/stores\/shopline/);
+  assert.match(routes, /\/products\/hot/);
+});
