@@ -1,6 +1,15 @@
 .plugin-access {
   margin-top: 18px;
 }
+.plugin-oauth-note {
+  margin: 14px 0 0;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 13px;
+  line-height: 1.55;
+}
 .plugin-actions {
   display: flex;
   align-items: center;

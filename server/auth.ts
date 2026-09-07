@@ -10,8 +10,27 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 export type Actor = { id: number; email: string };
 export type AuthenticatedRequest = Request & { actor?: Actor };
 
+export async function actorFromRequest(req: Request): Promise<Actor | null> {
+  try {
+    const token = req.cookies?.[SESSION_COOKIE];
+    if (!token) return null;
+    const payload = jwt.verify(token, sessionSecret()) as Actor;
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id },
+      select: { id: true, email: true, status: true },
+    });
+    return user?.status === "ACTIVE"
+      ? { id: user.id, email: user.email }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function issueSession(res: Response, actor: Actor) {
-  const token = jwt.sign(actor, sessionSecret(), { expiresIn: SESSION_TTL_SECONDS });
+  const token = jwt.sign(actor, sessionSecret(), {
+    expiresIn: SESSION_TTL_SECONDS,
+  });
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -22,26 +41,31 @@ export function issueSession(res: Response, actor: Actor) {
 }
 
 export function clearSession(res: Response) {
-  res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: "lax", path: "/", secure: process.env.NODE_ENV === "production" });
+  res.clearCookie(SESSION_COOKIE, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+  });
 }
 
-export async function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  try {
-    const token = req.cookies?.[SESSION_COOKIE];
-    if (!token) return res.status(401).json({ success: false, error: "请先登录" });
-    const payload = jwt.verify(token, sessionSecret()) as Actor;
-    const user = await prisma.user.findUnique({ where: { id: payload.id }, select: { id: true, email: true, status: true } });
-    if (!user || user.status !== "ACTIVE") return res.status(401).json({ success: false, error: "登录已失效" });
-    req.actor = { id: user.id, email: user.email };
-    next();
-  } catch {
+export async function authenticate(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  const actor = await actorFromRequest(req);
+  if (!actor)
     return res.status(401).json({ success: false, error: "登录已失效" });
-  }
+  req.actor = actor;
+  next();
 }
 
 export function requireCsrf(req: Request, res: Response, next: NextFunction) {
-  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return next();
-  if (req.header("x-page-center-csrf") !== "1") return res.status(403).json({ success: false, error: "请求来源校验失败" });
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS")
+    return next();
+  if (req.header("x-page-center-csrf") !== "1")
+    return res.status(403).json({ success: false, error: "请求来源校验失败" });
   next();
 }
 
@@ -49,12 +73,15 @@ export async function ensureAdmin() {
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
   if (!email || !password) {
-    if (process.env.NODE_ENV === "production") throw new Error("ADMIN_BOOTSTRAP_NOT_CONFIGURED");
+    if (process.env.NODE_ENV === "production")
+      throw new Error("ADMIN_BOOTSTRAP_NOT_CONFIGURED");
     return;
   }
   const existing = await prisma.user.findUnique({ where: { email } });
   if (!existing) {
-    await prisma.user.create({ data: { email, passwordHash: await bcrypt.hash(password, 12) } });
+    await prisma.user.create({
+      data: { email, passwordHash: await bcrypt.hash(password, 12) },
+    });
   } else if (!(await bcrypt.compare(password, existing.passwordHash))) {
     await prisma.user.update({
       where: { id: existing.id },

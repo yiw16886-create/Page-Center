@@ -20,6 +20,8 @@ model User {
   actionLogs     ActionLog[]
   actionReceipts ActionReceipt[]
   pluginTokens   PluginAccessToken[]
+  oauthCodes     OAuthAuthorizationCode[]
+  oauthTokens    OAuthAccessToken[]
 }
 
 model PluginAccessToken {
@@ -35,6 +37,44 @@ model PluginAccessToken {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
+}
+
+model OAuthAuthorizationCode {
+  id            String    @id @default(uuid())
+  userId        Int
+  codeHash      String    @unique
+  clientId      String
+  redirectUri   String
+  codeChallenge String
+  resource      String
+  scopes        String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model OAuthAccessToken {
+  id               String    @id @default(uuid())
+  userId           Int
+  clientId         String
+  accessTokenHash  String    @unique
+  refreshTokenHash String    @unique
+  resource         String
+  scopes           String
+  expiresAt        DateTime
+  refreshExpiresAt DateTime
+  revokedAt        DateTime?
+  lastUsedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@index([refreshExpiresAt])
 }
 
 model MetaOAuthState {

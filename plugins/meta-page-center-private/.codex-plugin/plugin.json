@@ -1,6 +1,6 @@
 {
   "name": "meta-page-center-private",
-  "version": "0.1.0",
+  "version": "0.2.0+codex.20260907014711",
   "description": "Privately manage authorized Meta Pages and publish confirmed posts.",
   "author": {
     "name": "yiw16886-create",
@@ -10,17 +10,17 @@
   "repository": "https://github.com/yiw16886-create/Page-Center",
   "keywords": ["meta", "facebook-pages", "publishing", "private"],
   "interface": {
-    "displayName": "Meta 公共主页（私人）",
-    "shortDescription": "读取并发布到你授权的 Meta 公共主页。",
-    "longDescription": "连接独立 Page Center，以私人 Token 读取已授权主页和帖子，并在明确确认后发布帖子。",
+    "displayName": "Meta \u516c\u5171\u4e3b\u9875\uff08\u79c1\u4eba\uff09",
+    "shortDescription": "\u8bfb\u53d6\u5e76\u53d1\u5e03\u5230\u4f60\u6388\u6743\u7684 Meta \u516c\u5171\u4e3b\u9875\u3002",
+    "longDescription": "\u901a\u8fc7\u4e13\u7528 OAuth 2.1 \u8fde\u63a5\u72ec\u7acb Page Center\uff0c\u8bfb\u53d6\u5df2\u6388\u6743\u4e3b\u9875\u548c\u5e16\u5b50\uff0c\u5e76\u5728\u660e\u786e\u786e\u8ba4\u540e\u53d1\u5e03\u5e16\u5b50\u3002",
     "developerName": "yiw16886-create",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
     "websiteURL": "https://page-center-tau.vercel.app",
     "defaultPrompt": [
-      "列出我已授权的 Meta 公共主页。",
-      "读取指定公共主页的最近帖子。",
-      "确认后把这段内容发布到指定公共主页。"
+      "\u5217\u51fa\u6211\u5df2\u6388\u6743\u7684 Meta \u516c\u5171\u4e3b\u9875\u3002",
+      "\u8bfb\u53d6\u6307\u5b9a\u516c\u5171\u4e3b\u9875\u7684\u6700\u8fd1\u5e16\u5b50\u3002",
+      "\u786e\u8ba4\u540e\u628a\u8fd9\u6bb5\u5185\u5bb9\u53d1\u5e03\u5230\u6307\u5b9a\u516c\u5171\u4e3b\u9875\u3002"
     ],
     "brandColor": "#1877F2"
   },

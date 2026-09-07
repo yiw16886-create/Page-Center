@@ -168,6 +168,10 @@ function PluginAccess() {
         </div>
         <Plug />
       </div>
+      <p className="plugin-oauth-note">
+        ChatGPT 网页版使用专用 OAuth 2.1 登录授权，无需复制 Token。 下方 Token
+        仅用于本地 Codex 兼容连接。
+      </p>
       <div className="plugin-actions">
         <button
           className="primary"
@@ -553,12 +557,22 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
+  const oauthReturn = new URLSearchParams(location.search).get("oauth_return");
   useEffect(() => {
     api
       .me()
       .then(setUser)
       .catch(() => setUser(null));
   }, []);
+  useEffect(() => {
+    if (
+      user &&
+      oauthReturn?.startsWith("/oauth/authorize?") &&
+      !oauthReturn.startsWith("//")
+    ) {
+      location.replace(oauthReturn);
+    }
+  }, [oauthReturn, user]);
   if (user === undefined)
     return <main className="loading">正在加载公共主页中心…</main>;
   return user ? (

@@ -7,18 +7,31 @@ const app = createApp();
 let bootstrap: Promise<void> | null = null;
 
 export default async function handler(req: Request, res: Response) {
-  const pathname = new URL(req.url || "/", "https://page-center.local").pathname;
-  if (pathname !== "/api/health" && pathname !== "/api/readiness") {
+  const pathname = new URL(req.url || "/", "https://page-center.local")
+    .pathname;
+  const skipsBootstrap =
+    pathname === "/api/health" ||
+    pathname === "/api/readiness" ||
+    pathname.startsWith("/.well-known/");
+  if (!skipsBootstrap) {
     bootstrap ||= ensureAdmin();
     try {
       await bootstrap;
     } catch (error) {
-      console.error(JSON.stringify({
-        level: "error",
-        message: "admin_bootstrap_failed",
-        error: error instanceof Error ? error.message : String(error),
-      }));
-      return res.status(503).json({ success: false, error: "服务尚未完成数据库初始化", code: "SERVICE_NOT_READY" });
+      console.error(
+        JSON.stringify({
+          level: "error",
+          message: "admin_bootstrap_failed",
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      return res
+        .status(503)
+        .json({
+          success: false,
+          error: "服务尚未完成数据库初始化",
+          code: "SERVICE_NOT_READY",
+        });
     }
   }
   return app(req, res);

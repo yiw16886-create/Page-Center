@@ -81,11 +81,14 @@ test("private MCP exposes only scoped Page tools and preserves publish safeguard
   const mcp = read("server/mcp.ts");
   const app = read("server/app.ts");
   for (const tool of ["list_pages", "get_page_posts", "publish_page_post"]) {
-    assert.match(mcp, new RegExp(`registerTool\\(\\s*"${tool}"`));
+    assert.match(mcp, new RegExp(`name: "${tool}"`));
   }
   assert.match(mcp, /confirmationText/);
   assert.match(mcp, /idempotencyKey/);
   assert.match(mcp, /destructiveHint: true/);
+  assert.match(mcp, /securitySchemes/);
+  assert.match(mcp, /pages\.read/);
+  assert.match(mcp, /pages\.write/);
   assert.match(app, /requirePluginToken/);
 });
 
@@ -101,7 +104,35 @@ test("plugin package targets the private production MCP endpoint", () => {
     "https://page-center-tau.vercel.app/api/mcp",
   );
   assert.equal(
-    config.mcpServers["meta-page-center-private"].bearer_token_env_var,
-    "PAGE_CENTER_PLUGIN_TOKEN",
+    "bearer_token_env_var" in config.mcpServers["meta-page-center-private"],
+    false,
   );
+});
+
+test("plugin OAuth implements discovery, PKCE, audience binding, and refresh rotation", () => {
+  const oauth = read("server/oauth.ts");
+  const schema = read("prisma/schema.prisma");
+  const app = read("server/app.ts");
+  assert.match(oauth, /oauth-protected-resource/);
+  assert.match(oauth, /oauth-authorization-server/);
+  assert.match(oauth, /code_challenge_methods_supported: \["S256"\]/);
+  assert.match(oauth, /authorization_response_iss_parameter_supported: true/);
+  assert.match(oauth, /client_id_metadata_document_supported: true/);
+  assert.match(oauth, /resource !== oauthResource\(\)/);
+  assert.match(oauth, /grantType === "refresh_token"/);
+  assert.match(oauth, /refreshTokenHash: hash\(nextRefreshToken\)/);
+  assert.match(schema, /model OAuthAuthorizationCode/);
+  assert.match(schema, /model OAuthAccessToken/);
+  assert.doesNotMatch(schema, /accessToken\s+String|refreshToken\s+String/);
+  assert.match(app, /express\.urlencoded/);
+  const vercel = read("vercel.json");
+  assert.match(vercel, /\/\.well-known\/\(\.\*\)/);
+  assert.match(vercel, /\/oauth\/\(\.\*\)/);
+});
+
+test("OAuth login return accepts only the internal authorize path", () => {
+  const app = read("src/App.tsx");
+  assert.match(app, /oauth_return/);
+  assert.match(app, /startsWith\("\/oauth\/authorize\?"\)/);
+  assert.match(app, /!oauthReturn\.startsWith\("\/\/"\)/);
 });
