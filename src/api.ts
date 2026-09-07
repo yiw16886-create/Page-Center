@@ -66,6 +66,7 @@ export type ProductDraft = {
   description: string;
   price: string | null;
   imageUrls: string[];
+  parseMode?: "direct" | "reader";
 };
 export type AiSettings = {
   aiTextModel: string;

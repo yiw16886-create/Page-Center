@@ -11,6 +11,7 @@ export type ProductDraft = {
   description: string;
   price: string | null;
   imageUrls: string[];
+  parseMode?: "direct" | "reader";
 };
 
 function decodeHtml(value: string) {
@@ -51,7 +52,7 @@ function privateIp(address: string) {
   );
 }
 
-async function safeUrl(value: string) {
+function publicUrl(value: string) {
   const url = new URL(value.trim());
   if (
     url.protocol !== "https:" ||
@@ -62,6 +63,15 @@ async function safeUrl(value: string) {
     url.hostname.endsWith(".localhost")
   )
     throw new Error("PRODUCT_URL_INVALID");
+  const literalAddress = isIP(url.hostname) ? url.hostname : "";
+  if (literalAddress && privateIp(literalAddress))
+    throw new Error("PRODUCT_URL_BLOCKED");
+  url.hash = "";
+  return url;
+}
+
+async function safeUrl(value: string) {
+  const url = publicUrl(value);
   const addresses = await lookup(url.hostname, { all: true, verbatim: true });
   if (!addresses.length || addresses.some(({ address }) => privateIp(address)))
     throw new Error("PRODUCT_URL_BLOCKED");
@@ -95,8 +105,8 @@ async function readLimitedHtml(response: Response) {
   return new TextDecoder().decode(bytes);
 }
 
-async function fetchProductHtml(input: string) {
-  let url = await safeUrl(input);
+async function fetchProductHtml(input: string | URL) {
+  let url = input instanceof URL ? input : await safeUrl(input);
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
     const response = await fetch(url, {
       redirect: "manual",
@@ -215,12 +225,107 @@ export function extractProductFromHtml(html: string, sourceUrl: string): Product
     description,
     price: priceAmount ? `${currency ? `${currency} ` : ""}${priceAmount}` : null,
     imageUrls: imageUrls.slice(0, MAX_IMAGES),
+    parseMode: "direct",
   };
 }
 
+type ReaderPayload = {
+  data?: {
+    title?: unknown;
+    description?: unknown;
+    content?: unknown;
+    url?: unknown;
+  };
+};
+
+export function extractProductFromReader(
+  payload: ReaderPayload,
+  sourceUrl: string,
+): ProductDraft {
+  const data = payload.data || {};
+  const title = decodeHtml(typeof data.title === "string" ? data.title : "").slice(0, 300);
+  const description = decodeHtml(
+    typeof data.description === "string" ? data.description : "",
+  ).slice(0, 4000);
+  const content = typeof data.content === "string" ? data.content : "";
+  if (!title) throw new Error("PRODUCT_TITLE_MISSING");
+
+  const headingAt = content.indexOf(`# ${title}`);
+  const productSection = headingAt >= 0 ? content.slice(headingAt, headingAt + 6000) : content;
+  const price = productSection.match(
+    /(?:[$€£]\s?\d[\d,]*(?:\.\d{1,2})?\s*(?:USD|EUR|GBP|CAD|AUD)?|\d[\d,]*(?:\.\d{1,2})?\s*(?:USD|EUR|GBP|CAD|AUD))/i,
+  )?.[0]?.trim() || null;
+
+  const titleWords = new Set(
+    title.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || [],
+  );
+  const candidates: Array<{ url: string; score: number; order: number }> = [];
+  let order = 0;
+  for (const match of content.matchAll(/!\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g)) {
+    const alt = match[1].toLowerCase();
+    const rawUrl = match[2].replaceAll("&amp;", "&");
+    try {
+      const image = new URL(rawUrl);
+      const path = image.pathname.toLowerCase();
+      if (!/\.(?:jpe?g|png|webp|avif)$/.test(path)) continue;
+      if (/logo|icon|payment|brand|badge/.test(`${alt} ${path}`)) continue;
+      const width = Number(image.searchParams.get("w") || 0);
+      const height = Number(image.searchParams.get("h") || 0);
+      if ((width && width < 300) || (height && height < 300)) continue;
+      const score = [...titleWords].filter((word) => alt.includes(word)).length;
+      candidates.push({ url: image.toString(), score, order: order++ });
+    } catch {
+      // Ignore malformed image links returned by the reader.
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score || a.order - b.order);
+  const imageUrls = [...new Set(candidates.map(({ url }) => url))].slice(0, MAX_IMAGES);
+  return {
+    sourceUrl,
+    title,
+    description,
+    price,
+    imageUrls,
+    parseMode: "reader",
+  };
+}
+
+async function parseWithReader(sourceUrl: string) {
+  const response = await fetch(`https://r.jina.ai/${sourceUrl}`, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "PageCenterProductPreview/1.0",
+    },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) throw new Error(`PRODUCT_READER_HTTP_${response.status}`);
+  const text = await readLimitedHtml(response);
+  return extractProductFromReader(JSON.parse(text) as ReaderPayload, sourceUrl);
+}
+
 export async function parseProductUrl(input: string) {
-  const { html, finalUrl } = await fetchProductHtml(input);
-  return extractProductFromHtml(html, finalUrl);
+  const fallbackInput = publicUrl(input);
+  try {
+    const safeInput = await safeUrl(fallbackInput.toString());
+    const { html, finalUrl } = await fetchProductHtml(safeInput);
+    return extractProductFromHtml(html, finalUrl);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    const name = error instanceof Error ? error.name : "";
+    const systemCode =
+      error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : "";
+    if (
+      code !== "PRODUCT_HTTP_403" &&
+      code !== "PRODUCT_HTTP_429" &&
+      name !== "TimeoutError" &&
+      !(error instanceof TypeError) &&
+      systemCode !== "EAI_AGAIN"
+    )
+      throw error;
+    return parseWithReader(fallbackInput.toString());
+  }
 }
 
 function outputText(body: any) {

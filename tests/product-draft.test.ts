@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   extractProductFromHtml,
+  extractProductFromReader,
   resolveAiRuntime,
 } from "../server/product-draft-service.js";
 
@@ -54,4 +55,25 @@ test("keeps direct OpenAI as a local compatibility fallback", () => {
   assert.equal(runtime.gateway, false);
   assert.equal(runtime.endpoint, "https://api.openai.com/v1/responses");
   assert.equal(runtime.model, "gpt-5-mini");
+});
+
+test("extracts a blocked storefront through the reader compatibility payload", () => {
+  const draft = extractProductFromReader(
+    {
+      data: {
+        title: "Quiet Tree Bird Feeder",
+        description: "A tree-inspired garden bird feeder &amp; sculpture.",
+        content: `![Logo](https://cdn.example.com/logo.png?w=800&h=200)
+![Quiet Tree Bird Feeder](https://cdn.example.com/tree.webp?w=1024&h=1024)
+# Quiet Tree Bird Feeder
+50% OFF$58.98 USD$117.96 USD`,
+      },
+    },
+    "https://shop.example.com/products/tree",
+  );
+  assert.equal(draft.title, "Quiet Tree Bird Feeder");
+  assert.equal(draft.description, "A tree-inspired garden bird feeder & sculpture.");
+  assert.equal(draft.price, "$58.98 USD");
+  assert.deepEqual(draft.imageUrls, ["https://cdn.example.com/tree.webp?w=1024&h=1024"]);
+  assert.equal(draft.parseMode, "reader");
 });

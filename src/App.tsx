@@ -255,7 +255,7 @@ function ProductLinkAssistant({
     <div className="product-assistant">
       <div className="assistant-heading">
         <span><Sparkles size={16} /> 商品链接智能草稿</span>
-        <small>临时解析，不写入数据库</small>
+        <small>临时解析，源站拒绝时安全回退，不写入数据库</small>
       </div>
       <form
         className="product-link-form"
@@ -298,6 +298,7 @@ function ProductLinkAssistant({
               <div><dt>商品名</dt><dd>{draft.title}</dd></div>
               <div><dt>价格</dt><dd>{draft.price || "页面未提供"}</dd></div>
               <div><dt>描述</dt><dd>{draft.description || "页面未提供"}</dd></div>
+              <div><dt>解析方式</dt><dd>{draft.parseMode === "reader" ? "兼容回退" : "直接读取"}</dd></div>
             </dl>
             {draft.imageUrls.length > 0 && (
               <label>

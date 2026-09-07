@@ -173,6 +173,8 @@ test("product-link drafts are ephemeral and replace the SHOPLINE catalog", () =>
   assert.doesNotMatch(schema, /model StoreConnection|model ProductLink/);
   assert.match(service, /MAX_HTML_BYTES/);
   assert.match(service, /PRODUCT_URL_BLOCKED/);
+  assert.match(service, /https:\/\/r\.jina\.ai\//);
+  assert.match(service, /PRODUCT_HTTP_403/);
   assert.match(service, /store: false/);
   assert.match(service, /VERCEL_OIDC_TOKEN/);
   assert.match(service, /ai-gateway\.vercel\.sh\/v1\/responses/);
