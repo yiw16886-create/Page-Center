@@ -467,6 +467,26 @@ button:disabled {
   color: #b91c1c;
   border-color: #fecaca;
 }
+.ai-model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.ai-model-grid label {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ai-model-grid select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #d7dee8;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e293b;
+}
 .product-assistant {
   display: grid;
   gap: 10px;
@@ -561,6 +581,46 @@ button:disabled {
   display: grid;
   grid-template-columns: 110px minmax(0, 1fr);
   gap: 8px;
+}
+.ai-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.ai-action-buttons button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 750;
+}
+.generated-image-chip {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: #f8fbff;
+  color: #475569;
+  font-size: 11px;
+}
+.generated-image-chip img {
+  width: 48px;
+  height: 48px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+.generated-image-chip button {
+  padding: 6px 8px;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff;
+  color: #b91c1c;
 }
 .status-card {
   position: absolute;
@@ -884,7 +944,8 @@ button:disabled {
     height: 180px;
   }
   .product-link-form,
-  .generation-options {
+  .generation-options,
+  .ai-model-grid {
     grid-template-columns: 1fr;
   }
 }

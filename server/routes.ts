@@ -25,9 +25,11 @@ import {
 } from "./plugin-token-service.js";
 import {
   generateFacebookCopy,
+  generateFacebookImage,
   parseProductUrl,
   type ProductDraft,
 } from "./product-draft-service.js";
+import { getAiSettings, saveAiSettings } from "./ai-settings.js";
 
 const router = Router();
 const asyncRoute =
@@ -116,6 +118,26 @@ router.delete(
     res.json({ success: true });
   }),
 );
+router.get(
+  "/settings/ai",
+  asyncRoute(async (req: AuthenticatedRequest, res) =>
+    res.json({ success: true, data: await getAiSettings(req.actor!.id) }),
+  ),
+);
+router.put(
+  "/settings/ai",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) =>
+    res.json({
+      success: true,
+      data: await saveAiSettings(
+        req.actor!.id,
+        String(req.body?.textModel || ""),
+        String(req.body?.imageModel || ""),
+      ),
+    }),
+  ),
+);
 router.post(
   "/product-drafts/parse",
   requireCsrf,
@@ -140,12 +162,35 @@ router.post(
     };
     if (!product.sourceUrl || !product.title)
       throw new Error("PRODUCT_DRAFT_INVALID");
-    res.json({
+    const settings = await getAiSettings(req.actor!.id);
+    res.set("Cache-Control", "no-store").json({
       success: true,
       data: await generateFacebookCopy(product, {
         language: String(req.body?.language || "zh-CN"),
         tone: String(req.body?.tone || "自然、有吸引力"),
+        model: settings.aiTextModel,
       }),
+    });
+  }),
+);
+router.post(
+  "/product-drafts/generate-image",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) => {
+    const input = req.body?.product || {};
+    const product: ProductDraft = {
+      sourceUrl: String(input.sourceUrl || "").slice(0, 2048),
+      title: String(input.title || "").slice(0, 300),
+      description: String(input.description || "").slice(0, 4000),
+      price: input.price ? String(input.price).slice(0, 100) : null,
+      imageUrls: [],
+    };
+    if (!product.sourceUrl || !product.title)
+      throw new Error("PRODUCT_DRAFT_INVALID");
+    const settings = await getAiSettings(req.actor!.id);
+    res.set("Cache-Control", "no-store").json({
+      success: true,
+      data: await generateFacebookImage(product, settings.aiImageModel),
     });
   }),
 );
@@ -205,6 +250,9 @@ router.post(
       pageId: req.params.pageId,
       message: String(req.body?.message || ""),
       imageUrl: req.body?.imageUrl ? String(req.body.imageUrl) : undefined,
+      imageDataUrl: req.body?.imageDataUrl
+        ? String(req.body.imageDataUrl)
+        : undefined,
       confirmationText: String(req.body?.confirmationText || ""),
       idempotencyKey: String(req.body?.idempotencyKey || ""),
     });

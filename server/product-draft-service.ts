@@ -233,20 +233,51 @@ function outputText(body: any) {
     .trim();
 }
 
+export function resolveAiRuntime(
+  env: NodeJS.ProcessEnv = process.env,
+  requestedModel?: string,
+) {
+  const gatewayToken =
+    env.AI_GATEWAY_API_KEY?.trim() || env.VERCEL_OIDC_TOKEN?.trim();
+  const openAiToken = env.OPENAI_API_KEY?.trim();
+  const gateway = Boolean(gatewayToken);
+  const configuredModel =
+    requestedModel?.trim() ||
+    env.AI_MODEL?.trim() ||
+    env.OPENAI_MODEL?.trim() ||
+    "gpt-5-mini";
+  return {
+    endpoint: gateway
+      ? "https://ai-gateway.vercel.sh/v1/responses"
+      : "https://api.openai.com/v1/responses",
+    token: gatewayToken || openAiToken || "",
+    model: gateway
+      ? configuredModel.includes("/")
+        ? configuredModel
+        : `openai/${configuredModel}`
+      : configuredModel.startsWith("openai/")
+        ? configuredModel.slice("openai/".length)
+        : configuredModel,
+    gateway,
+  };
+}
+
 export async function generateFacebookCopy(
   draft: ProductDraft,
-  options: { language?: string; tone?: string } = {},
+  options: { language?: string; tone?: string; model?: string } = {},
 ) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) throw new Error("OPENAI_NOT_CONFIGURED");
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const runtime = resolveAiRuntime(process.env, options.model);
+  if (!runtime.token) throw new Error("AI_NOT_CONFIGURED");
+  if (!runtime.gateway && options.model && !options.model.startsWith("openai/"))
+    throw new Error("AI_MODEL_REQUIRES_GATEWAY");
+  const response = await fetch(runtime.endpoint, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${runtime.token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL?.trim() || "gpt-5-mini",
+      model: runtime.model,
       store: false,
       max_output_tokens: 700,
       instructions:
@@ -261,16 +292,75 @@ export async function generateFacebookCopy(
           sourceUrl: draft.sourceUrl,
         },
       }),
+      ...(runtime.gateway
+        ? {
+            providerOptions: {
+              gateway: { disallowPromptTraining: true },
+            },
+          }
+        : {}),
     }),
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
     if (response.status === 401 || response.status === 403)
-      throw new Error("OPENAI_AUTH_INVALID");
-    if (response.status === 429) throw new Error("OPENAI_RATE_LIMITED");
-    throw new Error(`OPENAI_HTTP_${response.status}`);
+      throw new Error("AI_AUTH_INVALID");
+    if (response.status === 402) throw new Error("AI_BUDGET_EXCEEDED");
+    if (response.status === 429) throw new Error("AI_RATE_LIMITED");
+    throw new Error(`AI_HTTP_${response.status}`);
   }
   const message = outputText(await response.json());
-  if (!message) throw new Error("OPENAI_EMPTY_RESPONSE");
+  if (!message) throw new Error("AI_EMPTY_RESPONSE");
   return { message: message.slice(0, 10_000) };
+}
+
+export async function generateFacebookImage(
+  draft: ProductDraft,
+  model: string,
+) {
+  const runtime = resolveAiRuntime();
+  if (!runtime.token) throw new Error("AI_NOT_CONFIGURED");
+  if (!runtime.gateway) throw new Error("AI_IMAGE_REQUIRES_GATEWAY");
+  const response = await fetch(
+    "https://ai-gateway.vercel.sh/v1/images/generations",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${runtime.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        n: 1,
+        prompt: [
+          "Create one polished square Facebook marketing image for the product below.",
+          "Keep the product visually plausible. Do not add prices, discounts, reviews, guarantees, logos, watermarks, or text that were not supplied.",
+          `Product: ${draft.title.slice(0, 300)}`,
+          `Description: ${draft.description.slice(0, 1500) || "No description supplied."}`,
+        ].join("\n"),
+        providerOptions: {
+          gateway: { disallowPromptTraining: true },
+          ...(model.startsWith("bfl/")
+            ? { blackForestLabs: { outputFormat: "jpeg" } }
+            : {}),
+        },
+      }),
+      signal: AbortSignal.timeout(60_000),
+    },
+  );
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403)
+      throw new Error("AI_AUTH_INVALID");
+    if (response.status === 402) throw new Error("AI_BUDGET_EXCEEDED");
+    if (response.status === 429) throw new Error("AI_RATE_LIMITED");
+    throw new Error(`AI_IMAGE_HTTP_${response.status}`);
+  }
+  const body = (await response.json()) as {
+    data?: Array<{ b64_json?: string }>;
+  };
+  const base64 = body.data?.[0]?.b64_json || "";
+  if (!base64) throw new Error("AI_IMAGE_EMPTY_RESPONSE");
+  if (base64.length > 3_500_000) throw new Error("AI_IMAGE_TOO_LARGE");
+  const mediaType = model.startsWith("bfl/") ? "image/jpeg" : "image/png";
+  return { imageDataUrl: `data:${mediaType};base64,${base64}`, model };
 }

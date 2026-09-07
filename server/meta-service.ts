@@ -115,16 +115,36 @@ export async function listPosts(userId: number, pageId: string, after?: string) 
   return client.posts(pageId, 20, after);
 }
 
-export async function publishPost(input: { userId: number; pageId: string; message: string; imageUrl?: string; confirmationText: string; idempotencyKey: string }) {
+export async function publishPost(input: { userId: number; pageId: string; message: string; imageUrl?: string; imageDataUrl?: string; confirmationText: string; idempotencyKey: string }) {
   if (input.confirmationText !== `PUBLISH:${input.pageId}`) throw new Error("CONFIRMATION_REQUIRED");
   if (!input.message.trim() || input.message.length > 63206) throw new Error("MESSAGE_INVALID");
   if (!/^[A-Za-z0-9_-]{12,128}$/.test(input.idempotencyKey)) throw new Error("IDEMPOTENCY_KEY_INVALID");
+  if (input.imageUrl && input.imageDataUrl) throw new Error("IMAGE_SOURCE_CONFLICT");
   if (input.imageUrl) {
     const url = new URL(input.imageUrl);
     if (url.protocol !== "https:" || ["localhost", "127.0.0.1", "::1"].includes(url.hostname)) throw new Error("IMAGE_URL_INVALID");
   }
+  let generatedImage:
+    | { bytes: Uint8Array; mediaType: "image/jpeg" | "image/png" }
+    | undefined;
+  if (input.imageDataUrl) {
+    if (input.imageDataUrl.length > 3_600_000) throw new Error("IMAGE_DATA_TOO_LARGE");
+    const match = input.imageDataUrl.match(/^data:(image\/(?:jpeg|png));base64,([A-Za-z0-9+/]+={0,2})$/);
+    if (!match) throw new Error("IMAGE_DATA_INVALID");
+    const bytes = Uint8Array.from(Buffer.from(match[2], "base64"));
+    if (!bytes.length || bytes.byteLength > 2_700_000) throw new Error("IMAGE_DATA_TOO_LARGE");
+    generatedImage = {
+      bytes,
+      mediaType: match[1] as "image/jpeg" | "image/png",
+    };
+  }
   const action = "PUBLISH_POST";
-  const requestHash = stableHash({ pageId: input.pageId, message: input.message, imageUrl: input.imageUrl || null });
+  const requestHash = stableHash({
+    pageId: input.pageId,
+    message: input.message,
+    imageUrl: input.imageUrl || null,
+    imageDataHash: input.imageDataUrl ? hash(input.imageDataUrl) : null,
+  });
   try {
     await prisma.actionReceipt.create({ data: { userId: input.userId, action, key: input.idempotencyKey, requestHash, resultJson: { state: "PENDING" } } });
   } catch {
@@ -136,13 +156,22 @@ export async function publishPost(input: { userId: number; pageId: string; messa
   }
   const { client } = await authorizedPage(input.userId, input.pageId, "canPublish");
   try {
-    const response = input.imageUrl ? await client.publishPhoto(input.pageId, input.message, input.imageUrl) : await client.publishText(input.pageId, input.message);
+    const response = generatedImage
+      ? await client.publishPhotoData(
+          input.pageId,
+          input.message,
+          generatedImage.bytes,
+          generatedImage.mediaType,
+        )
+      : input.imageUrl
+        ? await client.publishPhoto(input.pageId, input.message, input.imageUrl)
+        : await client.publishText(input.pageId, input.message);
     const postId = ("post_id" in response ? response.post_id : undefined) || response.id;
     if (!postId) throw new Error("META_POST_ID_MISSING");
     const result = { success: true, pageId: input.pageId, postId };
     await prisma.$transaction([
       prisma.actionReceipt.update({ where: { userId_action_key: { userId: input.userId, action, key: input.idempotencyKey } }, data: { resultJson: result } }),
-      prisma.actionLog.create({ data: { userId: input.userId, action, pageId: input.pageId, status: "SUCCESS", requestJson: { messageLength: input.message.length, imageHost: input.imageUrl ? new URL(input.imageUrl).hostname : null }, resultJson: result } }),
+      prisma.actionLog.create({ data: { userId: input.userId, action, pageId: input.pageId, status: "SUCCESS", requestJson: { messageLength: input.message.length, imageSource: generatedImage ? "AI_GENERATED" : input.imageUrl ? new URL(input.imageUrl).hostname : null }, resultJson: result } }),
     ]);
     return result;
   } catch (error) {

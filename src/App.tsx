@@ -6,6 +6,7 @@ import {
   Copy,
   ExternalLink,
   FileText,
+  ImagePlus,
   KeyRound,
   LogOut,
   MessageSquareText,
@@ -22,6 +23,7 @@ import {
 import { toast } from "sonner";
 import {
   api,
+  type AiSettings,
   ApiError,
   type MetaStatus,
   type PluginToken,
@@ -235,13 +237,16 @@ function PluginAccess() {
 }
 
 function ProductLinkAssistant({
-  onApply,
+  onText,
+  onImage,
 }: {
-  onApply: (message: string, imageUrl: string) => void;
+  onText: (message: string) => void;
+  onImage: (imageUrl: string, imageDataUrl: string) => void;
 }) {
   const [productUrl, setProductUrl] = useState("");
   const [draft, setDraft] = useState<ProductDraft | null>(null);
   const [selectedImage, setSelectedImage] = useState("");
+  const [previewImage, setPreviewImage] = useState("");
   const [language, setLanguage] = useState("zh-CN");
   const [tone, setTone] = useState("自然、有吸引力");
   const [busy, setBusy] = useState("");
@@ -263,6 +268,7 @@ function ProductLinkAssistant({
             .then((value) => {
               setDraft(value);
               setSelectedImage(value.imageUrls[0] || "");
+              setPreviewImage(value.imageUrls[0] || "");
               toast.success("商品信息解析完成");
             })
             .catch((error) =>
@@ -284,8 +290,8 @@ function ProductLinkAssistant({
       </form>
       {draft && (
         <div className="product-preview">
-          {selectedImage && (
-            <img src={selectedImage} alt={draft.title} referrerPolicy="no-referrer" />
+          {previewImage && (
+            <img src={previewImage} alt={draft.title} referrerPolicy="no-referrer" />
           )}
           <div className="product-fields">
             <dl>
@@ -296,7 +302,10 @@ function ProductLinkAssistant({
             {draft.imageUrls.length > 0 && (
               <label>
                 发布图片
-                <select value={selectedImage} onChange={(event) => setSelectedImage(event.target.value)}>
+                <select value={selectedImage} onChange={(event) => {
+                  setSelectedImage(event.target.value);
+                  setPreviewImage(event.target.value);
+                }}>
                   {draft.imageUrls.map((url, index) => (
                     <option value={url} key={url}>原图 {index + 1}</option>
                   ))}
@@ -316,26 +325,59 @@ function ProductLinkAssistant({
                 <input value={tone} maxLength={80} onChange={(event) => setTone(event.target.value)} />
               </label>
             </div>
-            <button
-              className="primary"
-              disabled={!!busy}
-              onClick={() => {
-                setBusy("generate");
-                void api.generateProductCopy(draft, { language, tone })
-                  .then(({ message }) => {
-                    onApply(message, selectedImage);
-                    toast.success("AI 文案已生成，可继续人工修改");
-                  })
-                  .catch((error) => toast.error(
-                    error instanceof Error && error.message === "OPENAI_NOT_CONFIGURED"
-                      ? "尚未配置 OPENAI_API_KEY"
-                      : error instanceof Error ? error.message : "AI 文案生成失败",
-                  ))
-                  .finally(() => setBusy(""));
-              }}
-            >
-              <Sparkles size={15} /> {busy === "generate" ? "生成中…" : "2. 生成并填入文案"}
-            </button>
+            <div className="ai-action-buttons">
+              <button
+                type="button"
+                disabled={!!busy || !selectedImage}
+                onClick={() => {
+                  setPreviewImage(selectedImage);
+                  onImage(selectedImage, "");
+                  toast.success("已选择商品原图");
+                }}
+              >
+                <Check size={15} /> 使用原图
+              </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={!!busy}
+                onClick={() => {
+                  setBusy("copy");
+                  void api.generateProductCopy(draft, { language, tone })
+                    .then(({ message }) => {
+                      onText(message);
+                      toast.success("AI 文案已生成，可继续人工修改");
+                    })
+                    .catch((error) => toast.error(
+                      error instanceof Error && error.message === "AI_NOT_CONFIGURED"
+                        ? "AI 生成服务尚未配置"
+                        : error instanceof Error ? error.message : "AI 文案生成失败",
+                    ))
+                    .finally(() => setBusy(""));
+                }}
+              >
+                <Sparkles size={15} /> {busy === "copy" ? "生成中…" : "AI 文案"}
+              </button>
+              <button
+                type="button"
+                disabled={!!busy}
+                onClick={() => {
+                  setBusy("image");
+                  void api.generateProductImage(draft)
+                    .then(({ imageDataUrl }) => {
+                      setPreviewImage(imageDataUrl);
+                      onImage("", imageDataUrl);
+                      toast.success("AI 配图已生成，仅保留在当前草稿");
+                    })
+                    .catch((error) => toast.error(
+                      error instanceof Error ? error.message : "AI 配图生成失败",
+                    ))
+                    .finally(() => setBusy(""));
+                }}
+              >
+                <ImagePlus size={15} /> {busy === "image" ? "生成中…" : "AI 配图"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -349,6 +391,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imageDataUrl, setImageDataUrl] = useState("");
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [busy, setBusy] = useState("");
   const [activeTab, setActiveTab] = useState<
     "posts" | "publish" | "comments" | "settings"
@@ -381,6 +425,11 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   useEffect(() => {
     void reloadMeta();
   }, [reloadMeta]);
+  useEffect(() => {
+    void api.aiSettings().then(setAiSettings).catch(() =>
+      toast.error("AI 模型设置读取失败"),
+    );
+  }, []);
   useEffect(() => {
     void reloadPosts();
   }, [reloadPosts]);
@@ -623,6 +672,63 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 <div className="widget-secondary">
                   <PluginAccess />
                 </div>
+                {aiSettings && (
+                  <section className="panel ai-settings widget-primary">
+                    <div className="panel-title">
+                      <div>
+                        <h2>AI 模型设置</h2>
+                        <p>全局默认模型；只有点击 AI 按钮时才会调用并计费</p>
+                      </div>
+                      <Sparkles />
+                    </div>
+                    <div className="ai-model-grid">
+                      <label>
+                        文案模型
+                        <select
+                          value={aiSettings.aiTextModel}
+                          onChange={(event) => setAiSettings({
+                            ...aiSettings,
+                            aiTextModel: event.target.value,
+                          })}
+                        >
+                          {aiSettings.textModels.map((model) => (
+                            <option key={model.id} value={model.id}>{model.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        图片模型
+                        <select
+                          value={aiSettings.aiImageModel}
+                          onChange={(event) => setAiSettings({
+                            ...aiSettings,
+                            aiImageModel: event.target.value,
+                          })}
+                        >
+                          {aiSettings.imageModels.map((model) => (
+                            <option key={model.id} value={model.id}>{model.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="settings-actions">
+                      <button
+                        className="primary"
+                        disabled={!!busy}
+                        onClick={() => void act("ai-settings", async () => {
+                          const saved = await api.saveAiSettings(
+                            aiSettings.aiTextModel,
+                            aiSettings.aiImageModel,
+                          );
+                          setAiSettings(saved);
+                          toast.success("AI 模型设置已保存");
+                        })}
+                      >
+                        <Check size={16} /> 保存模型设置
+                      </button>
+                    </div>
+                  </section>
+                )}
               </>
             )}
 
@@ -636,9 +742,10 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <Send />
                 </div>
                 <ProductLinkAssistant
-                  onApply={(generatedMessage, generatedImage) => {
-                    setMessage(generatedMessage);
-                    setImageUrl(generatedImage);
+                  onText={setMessage}
+                  onImage={(generatedImageUrl, generatedImageData) => {
+                    setImageUrl(generatedImageUrl);
+                    setImageDataUrl(generatedImageData);
                   }}
                 />
                 <textarea
@@ -647,12 +754,20 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   maxLength={63206}
                   onChange={(e) => setMessage(e.target.value)}
                 />
-                <input
-                  type="url"
-                  placeholder="可选：图片 HTTPS URL"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                />
+                {imageDataUrl ? (
+                  <div className="generated-image-chip">
+                    <img src={imageDataUrl} alt="AI 生成配图预览" />
+                    <span>AI 生成配图 · 仅保留在当前草稿</span>
+                    <button type="button" onClick={() => setImageDataUrl("")}>移除</button>
+                  </div>
+                ) : (
+                  <input
+                    type="url"
+                    placeholder="可选：图片 HTTPS URL"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                  />
+                )}
                 <div className="composer-foot">
                   <span>{message.length.toLocaleString()} / 63,206</span>
                   <button
@@ -671,10 +786,12 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           selected.pageId,
                           message,
                           imageUrl,
+                          imageDataUrl,
                         );
                         toast.success(`发布成功：${result.postId}`);
                         setMessage("");
                         setImageUrl("");
+                        setImageDataUrl("");
                         await reloadPosts();
                       })
                     }

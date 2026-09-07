@@ -67,6 +67,12 @@ export type ProductDraft = {
   price: string | null;
   imageUrls: string[];
 };
+export type AiSettings = {
+  aiTextModel: string;
+  aiImageModel: string;
+  textModels: ReadonlyArray<{ id: string; label: string }>;
+  imageModels: ReadonlyArray<{ id: string; label: string }>;
+};
 
 export const api = {
   me: () => request<User>("/api/auth/me"),
@@ -101,6 +107,13 @@ export const api = {
       method: "DELETE",
       headers,
     }),
+  aiSettings: () => request<AiSettings>("/api/settings/ai"),
+  saveAiSettings: (textModel: string, imageModel: string) =>
+    request<AiSettings>("/api/settings/ai", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ textModel, imageModel }),
+    }),
   parseProduct: (url: string) =>
     request<ProductDraft>("/api/product-drafts/parse", {
       method: "POST",
@@ -116,11 +129,25 @@ export const api = {
       headers,
       body: JSON.stringify({ product, ...options }),
     }),
+  generateProductImage: (product: ProductDraft) =>
+    request<{ imageDataUrl: string; model: string }>(
+      "/api/product-drafts/generate-image",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ product }),
+      },
+    ),
   posts: (pageId: string) =>
     request<{ posts: Post[]; nextCursor: string | null }>(
       `/api/pages/${encodeURIComponent(pageId)}/posts`,
     ),
-  publish: (pageId: string, message: string, imageUrl: string) =>
+  publish: (
+    pageId: string,
+    message: string,
+    imageUrl: string,
+    imageDataUrl: string,
+  ) =>
     request<{ postId: string }>(
       `/api/pages/${encodeURIComponent(pageId)}/posts`,
       {
@@ -129,6 +156,7 @@ export const api = {
         body: JSON.stringify({
           message,
           imageUrl: imageUrl || undefined,
+          imageDataUrl: imageDataUrl || undefined,
           confirmationText: `PUBLISH:${pageId}`,
           idempotencyKey: crypto.randomUUID().replaceAll("-", ""),
         }),

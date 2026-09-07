@@ -174,7 +174,25 @@ test("product-link drafts are ephemeral and replace the SHOPLINE catalog", () =>
   assert.match(service, /MAX_HTML_BYTES/);
   assert.match(service, /PRODUCT_URL_BLOCKED/);
   assert.match(service, /store: false/);
+  assert.match(service, /VERCEL_OIDC_TOKEN/);
+  assert.match(service, /ai-gateway\.vercel\.sh\/v1\/responses/);
+  assert.match(service, /disallowPromptTraining: true/);
   assert.match(routes, /\/product-drafts\/parse/);
   assert.match(routes, /\/product-drafts\/generate/);
   assert.doesNotMatch(routes, /\/stores\/shopline|\/products\/hot/);
+});
+
+test("AI generation remains opt-in and generated images are not persisted", () => {
+  const app = read("src/App.tsx");
+  const routes = read("server/routes.ts");
+  const schema = read("prisma/schema.prisma");
+  const meta = read("server/meta-service.ts");
+  assert.match(app, /AI 文案/);
+  assert.match(app, /AI 配图/);
+  assert.match(app, /只有点击 AI 按钮时才会调用并计费/);
+  assert.match(routes, /\/settings\/ai/);
+  assert.match(routes, /\/product-drafts\/generate-image/);
+  assert.match(meta, /imageDataHash/);
+  assert.match(meta, /IMAGE_DATA_TOO_LARGE/);
+  assert.doesNotMatch(schema, /PostDraft|GeneratedImage|imageData|imageUrl/);
 });

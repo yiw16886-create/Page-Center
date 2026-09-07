@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractProductFromHtml } from "../server/product-draft-service.js";
+import {
+  extractProductFromHtml,
+  resolveAiRuntime,
+} from "../server/product-draft-service.js";
 
 test("extracts product OG fields without storing a catalog", () => {
   const draft = extractProductFromHtml(
@@ -30,4 +33,25 @@ test("falls back to Product JSON-LD and resolves relative images", () => {
   assert.equal(draft.title, "Tree Sculpture");
   assert.equal(draft.price, "USD 39");
   assert.deepEqual(draft.imageUrls, ["https://shop.example.com/images/tree.jpg"]);
+});
+
+test("uses Vercel OIDC with AI Gateway without a static provider key", () => {
+  const runtime = resolveAiRuntime({
+    VERCEL_OIDC_TOKEN: "short-lived-vercel-token",
+    OPENAI_MODEL: "gpt-5-mini",
+  } as NodeJS.ProcessEnv);
+  assert.equal(runtime.gateway, true);
+  assert.equal(runtime.endpoint, "https://ai-gateway.vercel.sh/v1/responses");
+  assert.equal(runtime.model, "openai/gpt-5-mini");
+  assert.equal(runtime.token, "short-lived-vercel-token");
+});
+
+test("keeps direct OpenAI as a local compatibility fallback", () => {
+  const runtime = resolveAiRuntime({
+    OPENAI_API_KEY: "local-openai-key",
+    OPENAI_MODEL: "gpt-5-mini",
+  } as NodeJS.ProcessEnv);
+  assert.equal(runtime.gateway, false);
+  assert.equal(runtime.endpoint, "https://api.openai.com/v1/responses");
+  assert.equal(runtime.model, "gpt-5-mini");
 });

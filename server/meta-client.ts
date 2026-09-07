@@ -72,4 +72,35 @@ export class PageClient {
   publishPhoto(pageId: string, message: string, imageUrl: string) {
     return this.graph<{ id?: string; post_id?: string }>(`${pageId}/photos`, "POST", { url: imageUrl, caption: message, published: "true" });
   }
+
+  async publishPhotoData(
+    pageId: string,
+    message: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ) {
+    const safePath = `${pageId}/photos`.split("/").map(encodeURIComponent).join("/");
+    const url = new URL(`https://graph.facebook.com/${this.version}/${safePath}`);
+    const form = new FormData();
+    form.set("caption", message);
+    form.set("published", "true");
+    form.set(
+      "source",
+      new Blob([bytes], { type: mediaType }),
+      mediaType === "image/png" ? "generated.png" : "generated.jpg",
+    );
+    const response = await this.request(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" },
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+    });
+    const body = (await response.json()) as {
+      id?: string;
+      post_id?: string;
+    } & GraphError;
+    if (!response.ok || body.error)
+      throw new Error(`META_GRAPH_ERROR_${body.error?.code || response.status}`);
+    return body;
+  }
 }
