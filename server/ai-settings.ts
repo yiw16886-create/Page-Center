@@ -21,6 +21,14 @@ export function validateAiModels(textModel: string, imageModel: string) {
   return { textModel, imageModel };
 }
 
+export function aiPreferenceData(textModel: string, imageModel: string) {
+  const values = validateAiModels(textModel, imageModel);
+  return {
+    aiTextModel: values.textModel,
+    aiImageModel: values.imageModel,
+  };
+}
+
 export async function getAiSettings(userId: number) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -39,7 +47,7 @@ export async function saveAiSettings(
   textModel: string,
   imageModel: string,
 ) {
-  const values = validateAiModels(textModel, imageModel);
-  await prisma.user.update({ where: { id: userId }, data: values });
+  const data = aiPreferenceData(textModel, imageModel);
+  await prisma.user.update({ where: { id: userId }, data });
   return getAiSettings(userId);
 }

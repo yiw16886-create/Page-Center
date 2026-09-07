@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   IMAGE_MODELS,
   TEXT_MODELS,
+  aiPreferenceData,
   validateAiModels,
 } from "../server/ai-settings.js";
 
@@ -23,5 +24,15 @@ test("AI settings reject browser-supplied models outside the allowlist", () => {
   assert.throws(
     () => validateAiModels("openai/gpt-5-mini", "unknown/image"),
     /AI_IMAGE_MODEL_INVALID/,
+  );
+});
+
+test("AI settings map API names to the Prisma user fields", () => {
+  assert.deepEqual(
+    aiPreferenceData("openai/gpt-5-mini", "bfl/flux-2-pro"),
+    {
+      aiTextModel: "openai/gpt-5-mini",
+      aiImageModel: "bfl/flux-2-pro",
+    },
   );
 });
