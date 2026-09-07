@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BarChart3,
+  CalendarClock,
   Check,
+  ChevronDown,
   Copy,
   ExternalLink,
   FileText,
   KeyRound,
   LogOut,
+  MessageSquareText,
   Plug,
   RefreshCw,
   Send,
+  Settings,
   ShieldCheck,
   Trash2,
   Unplug,
@@ -19,7 +24,6 @@ import {
   api,
   ApiError,
   type MetaStatus,
-  type Page,
   type PluginToken,
   type Post,
   type User,
@@ -236,6 +240,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [busy, setBusy] = useState("");
+  const [activeTab, setActiveTab] = useState<"posts" | "publish" | "comments">(
+    "publish",
+  );
   const selected = useMemo(
     () => meta?.pages.find((page) => page.pageId === selectedId) || null,
     [meta, selectedId],
@@ -320,43 +327,93 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       </header>
       <main className="workspace">
         <aside>
-          <div className="aside-title">
-            <span>已授权主页</span>
-            <strong>{meta?.pages.length || 0}</strong>
+          <div className="aside-main">
+            <div className="aside-title">
+              <span>已授权主页</span>
+              <strong>{meta?.pages.length || 0}</strong>
+            </div>
+            {meta?.pages.map((page) => (
+              <button
+                key={page.pageId}
+                className={`page-item ${selectedId === page.pageId ? "active" : ""}`}
+                onClick={() => setSelectedId(page.pageId)}
+              >
+                <span className="avatar">{page.pageName.slice(0, 1)}</span>
+                <span>
+                  <strong>{page.pageName}</strong>
+                  <small>{page.category || "公共主页"}</small>
+                </span>
+              </button>
+            ))}
+            {meta?.connected && !meta.pages.length && (
+              <Empty
+                icon={FileText}
+                title="没有可用主页"
+                detail="检查主页角色和授权权限"
+              />
+            )}
           </div>
-          {meta?.pages.map((page) => (
-            <button
-              key={page.pageId}
-              className={`page-item ${selectedId === page.pageId ? "active" : ""}`}
-              onClick={() => setSelectedId(page.pageId)}
-            >
-              <span className="avatar">{page.pageName.slice(0, 1)}</span>
-              <span>
-                <strong>{page.pageName}</strong>
-                <small>{page.category || "公共主页"}</small>
-              </span>
+          <nav className="extension-nav" aria-label="扩展模块">
+            <button disabled title="即将开放">
+              <BarChart3 size={16} /> 数据分析 <span>即将开放</span>
             </button>
-          ))}
-          {meta?.connected && !meta.pages.length && (
-            <Empty
-              icon={FileText}
-              title="没有可用主页"
-              detail="检查主页角色和授权权限"
-            />
-          )}
+            <button disabled title="即将开放">
+              <CalendarClock size={16} /> 自动化规则 <span>即将开放</span>
+            </button>
+            <button disabled title="即将开放">
+              <Settings size={16} /> 设置 <span>即将开放</span>
+            </button>
+          </nav>
         </aside>
         <section className="content">
-          <div className="hero">
-            <div>
-              <p className="eyebrow">STANDALONE MODULE</p>
-              <h1>{selected?.pageName || "公共主页工作台"}</h1>
-              <p>
-                {selected
-                  ? `Page ID ${selected.pageId}`
-                  : "连接 Meta 后管理主页内容并发布帖子。"}
-              </p>
+          <div className="page-toolbar">
+            <div className="page-identity">
+              <span className="avatar toolbar-avatar">
+                {(selected?.pageName || "P").slice(0, 1)}
+              </span>
+              <div>
+                <div className="identity-line">
+                  <h1>{selected?.pageName || "公共主页工作台"}</h1>
+                  <Badge ok={!!selected?.canRead}>
+                    {selected?.canRead ? "运行正常" : "等待授权"}
+                  </Badge>
+                </div>
+                <p>
+                  {selected ? `ID ${selected.pageId}` : "请选择或连接公共主页"}
+                </p>
+              </div>
             </div>
-            <div className="hero-actions">
+            <div className="toolbar-actions">
+              <details className="status-popover">
+                <summary>
+                  <span
+                    className={`status-dot ${meta?.connected ? "online" : ""}`}
+                  />
+                  {meta?.connected ? "Meta 已连接" : "Meta 未连接"}
+                  <ChevronDown size={14} />
+                </summary>
+                <div className="status-card">
+                  <strong>授权状态</strong>
+                  <dl>
+                    <div>
+                      <dt>Meta 账号</dt>
+                      <dd>{meta?.facebookUserName || "未连接"}</dd>
+                    </div>
+                    <div>
+                      <dt>最近校验</dt>
+                      <dd>
+                        {meta?.lastVerifiedAt
+                          ? new Date(meta.lastVerifiedAt).toLocaleString()
+                          : "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Token</dt>
+                      <dd>服务端加密</dd>
+                    </div>
+                  </dl>
+                </div>
+              </details>
               <button
                 className="primary"
                 disabled={!!busy}
@@ -390,7 +447,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                     校验
                   </button>
                   <button
-                    className="danger"
+                    className="danger compact-danger"
                     disabled={!!busy}
                     onClick={() => {
                       if (confirm("断开当前账号的 Meta 授权？"))
@@ -407,148 +464,197 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               )}
             </div>
           </div>
-          {selected && (
-            <div className="permissions">
-              <Badge ok={selected.canRead}>读取帖子</Badge>
-              <Badge ok={selected.canPublish}>发布帖子</Badge>
-              <Badge ok={selected.canManageComments}>管理评论</Badge>
-            </div>
-          )}
-          <div className="grid">
-            <section className="panel composer">
-              <div className="panel-title">
-                <div>
-                  <h2>发布帖子</h2>
-                  <p>文本或公开 HTTPS 图片地址</p>
+
+          <div
+            className="workspace-tabs"
+            role="tablist"
+            aria-label="主页工作区"
+          >
+            <button
+              role="tab"
+              aria-selected={activeTab === "posts"}
+              className={activeTab === "posts" ? "active" : ""}
+              onClick={() => setActiveTab("posts")}
+            >
+              <FileText size={15} /> 读取帖子
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === "publish"}
+              className={activeTab === "publish" ? "active" : ""}
+              onClick={() => setActiveTab("publish")}
+            >
+              <Send size={15} /> 发布帖子
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === "comments"}
+              className={activeTab === "comments" ? "active" : ""}
+              onClick={() => setActiveTab("comments")}
+            >
+              <MessageSquareText size={15} /> 管理评论
+              <span className="beta-tag">预留</span>
+            </button>
+          </div>
+
+          <div className="bento-grid">
+            {activeTab === "publish" && (
+              <section className="panel composer widget-primary">
+                <div className="panel-title">
+                  <div>
+                    <h2>发布帖子</h2>
+                    <p>文本或公开 HTTPS 图片地址</p>
+                  </div>
+                  <Send />
                 </div>
-                <Send />
-              </div>
-              <textarea
-                placeholder="写下要发布到公共主页的内容…"
-                value={message}
-                maxLength={63206}
-                onChange={(e) => setMessage(e.target.value)}
-              />
-              <input
-                type="url"
-                placeholder="可选：图片 HTTPS URL"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-              />
-              <div className="composer-foot">
-                <span>{message.length.toLocaleString()} / 63,206</span>
-                <button
-                  className="primary"
-                  disabled={!selected?.canPublish || !message.trim() || !!busy}
-                  onClick={() =>
-                    void act("publish", async () => {
-                      if (
-                        !selected ||
-                        !confirm(`确认发布到“${selected.pageName}”？`)
-                      )
-                        return;
-                      const result = await api.publish(
-                        selected.pageId,
-                        message,
-                        imageUrl,
-                      );
-                      toast.success(`发布成功：${result.postId}`);
-                      setMessage("");
-                      setImageUrl("");
-                      await reloadPosts();
-                    })
-                  }
-                >
-                  {busy === "publish" ? "发布中…" : "确认发布"}
-                </button>
-              </div>
-            </section>
-            <section className="panel connection">
+                <textarea
+                  placeholder="写下要发布到公共主页的内容…"
+                  value={message}
+                  maxLength={63206}
+                  onChange={(e) => setMessage(e.target.value)}
+                />
+                <input
+                  type="url"
+                  placeholder="可选：图片 HTTPS URL"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                />
+                <div className="composer-foot">
+                  <span>{message.length.toLocaleString()} / 63,206</span>
+                  <button
+                    className="primary"
+                    disabled={
+                      !selected?.canPublish || !message.trim() || !!busy
+                    }
+                    onClick={() =>
+                      void act("publish", async () => {
+                        if (
+                          !selected ||
+                          !confirm(`确认发布到“${selected.pageName}”？`)
+                        )
+                          return;
+                        const result = await api.publish(
+                          selected.pageId,
+                          message,
+                          imageUrl,
+                        );
+                        toast.success(`发布成功：${result.postId}`);
+                        setMessage("");
+                        setImageUrl("");
+                        await reloadPosts();
+                      })
+                    }
+                  >
+                    {busy === "publish" ? "发布中…" : "确认发布"}
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {activeTab === "posts" && (
+              <section className="panel posts widget-primary">
+                <div className="panel-title">
+                  <div>
+                    <h2>最近帖子</h2>
+                    <p>
+                      {selected
+                        ? `来自 ${selected.pageName}`
+                        : "选择公共主页后查看"}
+                    </p>
+                  </div>
+                  <button
+                    className="icon-button"
+                    aria-label="刷新帖子"
+                    disabled={!selectedId || !!busy}
+                    onClick={() => void act("posts", reloadPosts)}
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+                {posts.length ? (
+                  <div className="post-list">
+                    {posts.map((post) => (
+                      <article key={post.id}>
+                        {post.full_picture && (
+                          <img src={post.full_picture} alt="帖子图片" />
+                        )}
+                        <div>
+                          <p>{post.message || "（图片帖子）"}</p>
+                          <span>
+                            {post.created_time
+                              ? new Date(post.created_time).toLocaleString()
+                              : post.id}
+                          </span>
+                          {post.permalink_url && (
+                            <a
+                              href={post.permalink_url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              在 Facebook 查看 <ExternalLink size={13} />
+                            </a>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <Empty
+                    icon={FileText}
+                    title="暂无帖子"
+                    detail={
+                      selected
+                        ? "授权后刷新，或先发布第一条帖子"
+                        : "请先连接并选择公共主页"
+                    }
+                  />
+                )}
+              </section>
+            )}
+
+            {activeTab === "comments" && (
+              <section className="panel widget-primary placeholder-panel">
+                <Empty
+                  icon={MessageSquareText}
+                  title="评论管理模块已预留"
+                  detail="后续可接入读取、回复、隐藏和删除评论工具"
+                />
+              </section>
+            )}
+
+            <section className="panel widget-secondary overview-widget">
               <div className="panel-title">
                 <div>
-                  <h2>授权状态</h2>
-                  <p>按当前登录用户隔离</p>
+                  <h2>主页能力</h2>
+                  <p>当前 OAuth 权限快照</p>
                 </div>
                 <KeyRound />
               </div>
-              <dl>
+              <div className="capability-list">
+                <Badge ok={!!selected?.canRead}>读取帖子</Badge>
+                <Badge ok={!!selected?.canPublish}>发布帖子</Badge>
+                <Badge ok={!!selected?.canManageComments}>管理评论</Badge>
+              </div>
+              <div className="widget-slot">
+                <CalendarClock size={18} />
                 <div>
-                  <dt>Meta 账号</dt>
-                  <dd>{meta?.facebookUserName || "未连接"}</dd>
+                  <strong>定时任务</strong>
+                  <span>扩展组件预留位</span>
                 </div>
+              </div>
+              <div className="widget-slot">
+                <BarChart3 size={18} />
                 <div>
-                  <dt>最近校验</dt>
-                  <dd>
-                    {meta?.lastVerifiedAt
-                      ? new Date(meta.lastVerifiedAt).toLocaleString()
-                      : "—"}
-                  </dd>
+                  <strong>数据概览</strong>
+                  <span>扩展组件预留位</span>
                 </div>
-                <div>
-                  <dt>Token 存储</dt>
-                  <dd>服务端加密</dd>
-                </div>
-              </dl>
+              </div>
             </section>
-          </div>
-          <PluginAccess />
-          <section className="panel posts">
-            <div className="panel-title">
-              <div>
-                <h2>最近帖子</h2>
-                <p>
-                  {selected
-                    ? `来自 ${selected.pageName}`
-                    : "选择公共主页后查看"}
-                </p>
-              </div>
-              <button
-                className="icon-button"
-                disabled={!selectedId || !!busy}
-                onClick={() => void act("posts", reloadPosts)}
-              >
-                <RefreshCw size={18} />
-              </button>
+
+            <div className="widget-full">
+              <PluginAccess />
             </div>
-            {posts.length ? (
-              <div className="post-list">
-                {posts.map((post) => (
-                  <article key={post.id}>
-                    {post.full_picture && (
-                      <img src={post.full_picture} alt="帖子图片" />
-                    )}
-                    <div>
-                      <p>{post.message || "（图片帖子）"}</p>
-                      <span>
-                        {post.created_time
-                          ? new Date(post.created_time).toLocaleString()
-                          : post.id}
-                      </span>
-                      {post.permalink_url && (
-                        <a
-                          href={post.permalink_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          在 Facebook 查看 <ExternalLink size={13} />
-                        </a>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <Empty
-                icon={FileText}
-                title="暂无帖子"
-                detail={
-                  selected
-                    ? "授权后刷新，或先发布第一条帖子"
-                    : "请先连接并选择公共主页"
-                }
-              />
-            )}
-          </section>
+          </div>
         </section>
       </main>
     </div>

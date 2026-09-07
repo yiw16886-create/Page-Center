@@ -136,3 +136,20 @@ test("OAuth login return accepts only the internal authorize path", () => {
   assert.match(app, /startsWith\("\/oauth\/authorize\?"\)/);
   assert.match(app, /!oauthReturn\.startsWith\("\/\/"\)/);
 });
+
+test("Page Center dashboard keeps a pluggable high-density UI shell", () => {
+  const app = read("src/App.tsx");
+  const styles = read("src/styles.css");
+  assert.match(app, /role="tablist"/);
+  assert.match(app, /读取帖子/);
+  assert.match(app, /发布帖子/);
+  assert.match(app, /管理评论/);
+  assert.match(app, /status-popover/);
+  assert.match(app, /extension-nav/);
+  assert.match(
+    styles,
+    /grid-template-columns:\s*repeat\(12,\s*minmax\(0,\s*1fr\)\)/,
+  );
+  assert.match(styles, /\.widget-primary\s*{[^}]*grid-column:\s*span 8/);
+  assert.match(styles, /\.widget-secondary\s*{[^}]*grid-column:\s*span 4/);
+});
