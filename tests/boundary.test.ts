@@ -177,7 +177,8 @@ test("product-link drafts are ephemeral and replace the SHOPLINE catalog", () =>
   assert.match(service, /PRODUCT_HTTP_403/);
   assert.match(service, /store: false/);
   assert.match(service, /VERCEL_OIDC_TOKEN/);
-  assert.match(service, /ai-gateway\.vercel\.sh\/v1\/responses/);
+  assert.match(service, /DEFAULT_AI_BASE_URL/);
+  assert.match(read("server/ai-endpoint.ts"), /ai-gateway\.vercel\.sh\/v1/);
   assert.match(service, /disallowPromptTraining: true/);
   assert.match(routes, /\/product-drafts\/parse/);
   assert.match(routes, /\/product-drafts\/generate/);
@@ -193,6 +194,11 @@ test("custom AI Gateway tokens are encrypted and never returned to the browser",
   assert.match(settings, /decryptToken/);
   assert.match(settings, /hasToken: Boolean/);
   assert.doesNotMatch(api, /aiGatewayTokenCiphertext/);
+  const endpoint = read("server/ai-endpoint.ts");
+  assert.match(endpoint, /url\.protocol !== "https:"/);
+  assert.match(endpoint, /AI_BASE_URL_BLOCKED/);
+  assert.match(endpoint, /chat\/completions/);
+  assert.match(read("server/product-draft-service.ts"), /redirect: "error"/);
 });
 
 test("AI generation remains opt-in and generated images are not persisted", () => {

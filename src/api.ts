@@ -71,6 +71,7 @@ export type ProductDraft = {
 export type AiSettings = {
   aiTextModel: string;
   aiImageModel: string;
+  aiBaseUrl: string;
   hasToken: boolean;
 };
 
@@ -111,12 +112,13 @@ export const api = {
   saveAiSettings: (
     textModel: string,
     imageModel: string,
+    baseUrl: string,
     options: { token?: string; clearToken?: boolean } = {},
   ) =>
     request<AiSettings>("/api/settings/ai", {
       method: "PUT",
       headers,
-      body: JSON.stringify({ textModel, imageModel, ...options }),
+      body: JSON.stringify({ textModel, imageModel, baseUrl, ...options }),
     }),
   parseProduct: (url: string) =>
     request<ProductDraft>("/api/product-drafts/parse", {

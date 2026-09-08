@@ -138,6 +138,7 @@ router.put(
         req.actor!.id,
         String(req.body?.textModel || ""),
         String(req.body?.imageModel || ""),
+        String(req.body?.baseUrl || ""),
         typeof req.body?.token === "string" ? req.body.token : undefined,
         req.body?.clearToken === true,
       ),
@@ -176,6 +177,7 @@ router.post(
         tone: String(req.body?.tone || "自然、有吸引力"),
         model: settings.aiTextModel,
         gatewayToken: settings.gatewayToken,
+        baseUrl: settings.aiBaseUrl,
       }),
     });
   }),
@@ -201,6 +203,7 @@ router.post(
         product,
         settings.aiImageModel,
         settings.gatewayToken,
+        settings.aiBaseUrl,
       ),
     });
   }),

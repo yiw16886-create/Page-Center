@@ -680,7 +680,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                       <div>
                         <h2>AI 连接与模型</h2>
                         <p>
-                          {aiSettings.hasToken ? "自定义 Token 已连接" : "尚未配置自定义 Token"}
+                          {aiSettings.hasToken ? "自定义 API Token 已连接" : "尚未配置自定义 API Token"}
                           ；只有点击 AI 按钮时才会调用并计费
                         </p>
                       </div>
@@ -712,7 +712,20 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                         />
                       </label>
                       <label className="ai-token-field">
-                        AI Gateway Token
+                        中转站 API 基础地址
+                        <input
+                          type="url"
+                          value={aiSettings.aiBaseUrl}
+                          maxLength={2048}
+                          placeholder="留空使用官方地址：https://api.openai.com/v1"
+                          onChange={(event) => setAiSettings({
+                            ...aiSettings,
+                            aiBaseUrl: event.target.value,
+                          })}
+                        />
+                      </label>
+                      <label className="ai-token-field">
+                        API Token
                         <input
                           type="password"
                           autoComplete="new-password"
@@ -720,7 +733,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           maxLength={4096}
                           placeholder={aiSettings.hasToken
                             ? "已安全保存；留空不会更换"
-                            : "粘贴你的 Vercel AI Gateway Token"}
+                            : "粘贴中转站或 AI Gateway Token"}
                           onChange={(event) => setAiGatewayToken(event.target.value)}
                         />
                       </label>
@@ -733,6 +746,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           const saved = await api.saveAiSettings(
                             aiSettings.aiTextModel,
                             aiSettings.aiImageModel,
+                            aiSettings.aiBaseUrl,
                             { token: aiGatewayToken || undefined },
                           );
                           setAiSettings(saved);
@@ -747,11 +761,12 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           className="danger"
                           disabled={!!busy}
                           onClick={() => {
-                            if (confirm("删除已保存的 AI Gateway Token？"))
+                            if (confirm("删除已保存的 AI API Token？"))
                               void act("ai-token-delete", async () => {
                                 const saved = await api.saveAiSettings(
                                   aiSettings.aiTextModel,
                                   aiSettings.aiImageModel,
+                                  aiSettings.aiBaseUrl,
                                   { clearToken: true },
                                 );
                                 setAiSettings(saved);

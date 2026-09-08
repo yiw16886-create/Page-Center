@@ -15,6 +15,7 @@ model User {
   status                   String                   @default("ACTIVE")
   aiTextModel              String                   @default("openai/gpt-5-mini")
   aiImageModel             String                   @default("bfl/flux-2-pro")
+  aiBaseUrl                String?
   aiGatewayTokenCiphertext String?                  @db.Text
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt

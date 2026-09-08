@@ -53,19 +53,44 @@ test("keeps direct OpenAI as a local compatibility fallback", () => {
     OPENAI_MODEL: "gpt-5-mini",
   } as NodeJS.ProcessEnv);
   assert.equal(runtime.gateway, false);
-  assert.equal(runtime.endpoint, "https://api.openai.com/v1/responses");
+  assert.equal(runtime.endpoint, "https://api.openai.com/v1/chat/completions");
   assert.equal(runtime.model, "gpt-5-mini");
 });
 
-test("an account Gateway token takes priority over deployment credentials", () => {
+test("an account token uses the official API when the relay address is blank", () => {
   const runtime = resolveAiRuntime(
     { VERCEL_OIDC_TOKEN: "deployment-token" } as NodeJS.ProcessEnv,
-    "anthropic/claude-sonnet-5",
+    "openai/gpt-5-mini",
     "account-token",
   );
-  assert.equal(runtime.gateway, true);
+  assert.equal(runtime.gateway, false);
+  assert.equal(runtime.endpoint, "https://api.openai.com/v1/chat/completions");
   assert.equal(runtime.token, "account-token");
-  assert.equal(runtime.model, "anthropic/claude-sonnet-5");
+  assert.equal(runtime.model, "gpt-5-mini");
+});
+
+test("uses an account token with a custom OpenAI-compatible relay", () => {
+  const runtime = resolveAiRuntime(
+    { VERCEL_OIDC_TOKEN: "deployment-token" } as NodeJS.ProcessEnv,
+    "gpt-5-mini",
+    "account-token",
+    "https://relay.example.com/v1",
+  );
+  assert.equal(runtime.gateway, false);
+  assert.equal(runtime.endpoint, "https://relay.example.com/v1/chat/completions");
+  assert.equal(runtime.token, "account-token");
+  assert.equal(runtime.model, "gpt-5-mini");
+});
+
+test("a configured relay never receives deployment Gateway credentials", () => {
+  const runtime = resolveAiRuntime(
+    { VERCEL_OIDC_TOKEN: "deployment-token" } as NodeJS.ProcessEnv,
+    "gpt-5-mini",
+    undefined,
+    "https://relay.example.com/v1",
+  );
+  assert.equal(runtime.endpoint, "https://relay.example.com/v1/chat/completions");
+  assert.equal(runtime.token, "");
 });
 
 test("extracts a blocked storefront through the reader compatibility payload", () => {
