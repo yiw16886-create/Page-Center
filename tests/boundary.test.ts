@@ -176,16 +176,14 @@ test("product-link drafts are ephemeral and replace the SHOPLINE catalog", () =>
   assert.match(service, /https:\/\/r\.jina\.ai\//);
   assert.match(service, /PRODUCT_HTTP_403/);
   assert.match(service, /store: false/);
-  assert.match(service, /VERCEL_OIDC_TOKEN/);
-  assert.match(service, /DEFAULT_AI_BASE_URL/);
-  assert.match(read("server/ai-endpoint.ts"), /ai-gateway\.vercel\.sh\/v1/);
-  assert.match(service, /disallowPromptTraining: true/);
+  assert.match(service, /requestedModel = "gpt-5\.5"/);
+  assert.match(read("server/ai-endpoint.ts"), /chat\/completions/);
   assert.match(routes, /\/product-drafts\/parse/);
   assert.match(routes, /\/product-drafts\/generate/);
   assert.doesNotMatch(routes, /\/stores\/shopline|\/products\/hot/);
 });
 
-test("custom AI Gateway tokens are encrypted and never returned to the browser", () => {
+test("AI relay tokens are encrypted and never returned to the browser", () => {
   const schema = read("prisma/schema.prisma");
   const settings = read("server/ai-settings.ts");
   const api = read("src/api.ts");
@@ -194,10 +192,11 @@ test("custom AI Gateway tokens are encrypted and never returned to the browser",
   assert.match(settings, /decryptToken/);
   assert.match(settings, /hasToken: Boolean/);
   assert.doesNotMatch(api, /aiGatewayTokenCiphertext/);
+  assert.match(api, /aiBaseUrl/);
+  assert.match(api, /availableModels/);
   const endpoint = read("server/ai-endpoint.ts");
   assert.match(endpoint, /url\.protocol !== "https:"/);
   assert.match(endpoint, /AI_BASE_URL_BLOCKED/);
-  assert.match(endpoint, /chat\/completions/);
   assert.match(read("server/product-draft-service.ts"), /redirect: "error"/);
 });
 
@@ -209,6 +208,9 @@ test("AI copy generation remains opt-in and image generation is absent", () => {
   assert.match(app, /AI 文案/);
   assert.doesNotMatch(app, /AI 配图|图片模型 ID/);
   assert.match(app, /只有点击 AI 按钮时才会调用并计费/);
+  assert.match(app, /availableModels\.map/);
+  assert.match(app, /中转站 API 基础地址/);
+  assert.doesNotMatch(app, /模型 ID/);
   assert.match(routes, /\/settings\/ai/);
   assert.doesNotMatch(routes, /\/product-drafts\/generate-image/);
   assert.match(meta, /imageDataHash/);

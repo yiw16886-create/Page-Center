@@ -240,7 +240,9 @@ function aiCopyErrorMessage(error: unknown) {
   if (code === "AI_NOT_CONFIGURED") return "请先在设置中填写 API Token";
   if (code === "AI_AUTH_INVALID") return "API Token 无效或没有调用权限";
   if (code === "AI_RELAY_ENDPOINT_OR_MODEL_NOT_FOUND")
-    return "中转站不支持该接口或模型，请检查基础地址和文案模型 ID";
+    return "中转站不支持所选模型或兼容接口，请检查模型和中转站地址";
+  if (code === "AI_HTTP_400")
+    return "中转站拒绝了生成参数，请确认所选模型支持文案生成";
   if (code === "AI_RATE_LIMITED") return "AI 请求过于频繁，请稍后重试";
   if (code === "AI_BUDGET_EXCEEDED") return "AI 账户余额或预算不足";
   return code || "AI 文案生成失败";
@@ -667,7 +669,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                       <div>
                         <h2>AI 连接与模型</h2>
                         <p>
-                          {aiSettings.hasToken ? "自定义 API Token 已连接" : "尚未配置自定义 API Token"}
+                          {aiSettings.hasToken ? "API Token 已连接" : "尚未配置 API Token"}
                           ；只有点击 AI 按钮时才会调用并计费
                         </p>
                       </div>
@@ -675,16 +677,20 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                     </div>
                     <div className="ai-model-grid">
                       <label>
-                        文案模型 ID
-                        <input
+                        文案模型
+                        <select
                           value={aiSettings.aiTextModel}
-                          maxLength={193}
-                          placeholder="openai/gpt-5-mini"
                           onChange={(event) => setAiSettings({
                             ...aiSettings,
                             aiTextModel: event.target.value,
                           })}
-                        />
+                        >
+                          {aiSettings.availableModels.map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.label}
+                            </option>
+                          ))}
+                        </select>
                       </label>
                       <label className="ai-token-field">
                         中转站 API 基础地址
@@ -692,7 +698,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           type="url"
                           value={aiSettings.aiBaseUrl}
                           maxLength={2048}
-                          placeholder="留空使用官方地址：https://api.openai.com/v1"
+                          placeholder="例如：https://www.zenapi.org/v1；留空走官方"
                           onChange={(event) => setAiSettings({
                             ...aiSettings,
                             aiBaseUrl: event.target.value,
@@ -708,7 +714,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           maxLength={4096}
                           placeholder={aiSettings.hasToken
                             ? "已安全保存；留空不会更换"
-                            : "粘贴中转站或 AI Gateway Token"}
+                            : "粘贴中转站或 OpenAI API Token"}
                           onChange={(event) => setAiGatewayToken(event.target.value)}
                         />
                       </label>
@@ -725,7 +731,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           );
                           setAiSettings(saved);
                           setAiGatewayToken("");
-                          toast.success("AI 连接与模型设置已保存");
+                          toast.success("AI 文案连接已保存");
                         })}
                       >
                         <Check size={16} /> 保存 AI 设置
@@ -744,7 +750,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                                 );
                                 setAiSettings(saved);
                                 setAiGatewayToken("");
-                                toast.success("自定义 AI Token 已删除");
+                                toast.success("AI API Token 已删除");
                               });
                           }}
                         >

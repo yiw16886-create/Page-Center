@@ -350,7 +350,7 @@ function outputText(body: any) {
 
 export function resolveAiRuntime(
   env: NodeJS.ProcessEnv = process.env,
-  requestedModel?: string,
+  requestedModel = "gpt-5.5",
   configuredGatewayToken?: string,
   configuredBaseUrl?: string,
 ) {
@@ -366,30 +366,16 @@ export function resolveAiRuntime(
       : deploymentGatewayToken
         ? DEFAULT_AI_BASE_URL
         : "https://api.openai.com/v1";
-  const token = customBaseUrl
-    ? accountToken || ""
-    : accountToken || deploymentGatewayToken || openAiToken || "";
   const endpoint = aiEndpoint(baseUrl);
-  const directOpenAi = new URL(baseUrl).hostname === "api.openai.com";
-  const configuredModel =
-    requestedModel?.trim() ||
-    env.AI_MODEL?.trim() ||
-    env.OPENAI_MODEL?.trim() ||
-    "gpt-5-mini";
   return {
     endpoint: endpoint.url,
     fallbackEndpoint: customBaseUrl ? endpoint.fallbackUrl : undefined,
     baseUrl,
-    token,
-    model: endpoint.gateway
-      ? configuredModel.includes("/")
-        ? configuredModel
-        : `openai/${configuredModel}`
-      : directOpenAi && configuredModel.startsWith("openai/")
-        ? configuredModel.slice("openai/".length)
-        : configuredModel,
+    token: customBaseUrl
+      ? accountToken || ""
+      : accountToken || deploymentGatewayToken || openAiToken || "",
+    model: endpoint.gateway ? `openai/${requestedModel}` : requestedModel,
     gateway: endpoint.gateway,
-    directOpenAi,
   };
 }
 
@@ -410,12 +396,6 @@ export async function generateFacebookCopy(
     options.baseUrl,
   );
   if (!runtime.token) throw new Error("AI_NOT_CONFIGURED");
-  if (
-    runtime.directOpenAi &&
-    options.model?.includes("/") &&
-    !options.model.startsWith("openai/")
-  )
-    throw new Error("AI_MODEL_REQUIRES_GATEWAY");
   await assertPublicAiBaseUrl(runtime.baseUrl);
   const productInput = {
     language: (options.language || "zh-CN").slice(0, 20),
@@ -441,16 +421,10 @@ export async function generateFacebookCopy(
   };
   const chatBody = {
       model: runtime.model,
-      max_tokens: 700,
+      max_completion_tokens: 700,
       messages: [
-        {
-          role: "system",
-          content: instructions,
-        },
-        {
-          role: "user",
-          content: JSON.stringify(productInput),
-        },
+        { role: "system", content: instructions },
+        { role: "user", content: JSON.stringify(productInput) },
       ],
   };
   const request = (url: string, body: object) => fetch(url, {

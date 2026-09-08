@@ -36,62 +36,50 @@ test("falls back to Product JSON-LD and resolves relative images", () => {
   assert.deepEqual(draft.imageUrls, ["https://shop.example.com/images/tree.jpg"]);
 });
 
-test("uses Vercel OIDC with AI Gateway without a static provider key", () => {
+test("uses the selected model with the official compatibility endpoint", () => {
   const runtime = resolveAiRuntime({
-    VERCEL_OIDC_TOKEN: "short-lived-vercel-token",
-    OPENAI_MODEL: "gpt-5-mini",
+    OPENAI_API_KEY: "deployment-openai-key",
+    OPENAI_MODEL: "ignored-model",
   } as NodeJS.ProcessEnv);
-  assert.equal(runtime.gateway, true);
-  assert.equal(runtime.endpoint, "https://ai-gateway.vercel.sh/v1/responses");
-  assert.equal(runtime.model, "openai/gpt-5-mini");
-  assert.equal(runtime.token, "short-lived-vercel-token");
-});
-
-test("keeps direct OpenAI as a local compatibility fallback", () => {
-  const runtime = resolveAiRuntime({
-    OPENAI_API_KEY: "local-openai-key",
-    OPENAI_MODEL: "gpt-5-mini",
-  } as NodeJS.ProcessEnv);
-  assert.equal(runtime.gateway, false);
   assert.equal(runtime.endpoint, "https://api.openai.com/v1/chat/completions");
-  assert.equal(runtime.model, "gpt-5-mini");
+  assert.equal(runtime.model, "gpt-5.5");
+  assert.equal(runtime.token, "deployment-openai-key");
 });
 
-test("an account token uses the official API when the relay address is blank", () => {
+test("a selected model and account token are sent to a custom relay", () => {
   const runtime = resolveAiRuntime(
-    { VERCEL_OIDC_TOKEN: "deployment-token" } as NodeJS.ProcessEnv,
-    "openai/gpt-5-mini",
-    "account-token",
+    { OPENAI_API_KEY: "deployment-openai-key" } as NodeJS.ProcessEnv,
+    "gpt-5.6-sol",
+    "account-relay-token",
+    "https://www.zenapi.org/v1",
   );
-  assert.equal(runtime.gateway, false);
-  assert.equal(runtime.endpoint, "https://api.openai.com/v1/chat/completions");
-  assert.equal(runtime.token, "account-token");
-  assert.equal(runtime.model, "gpt-5-mini");
+  assert.equal(runtime.endpoint, "https://www.zenapi.org/v1/chat/completions");
+  assert.equal(runtime.fallbackEndpoint, "https://www.zenapi.org/v1/responses");
+  assert.equal(runtime.token, "account-relay-token");
+  assert.equal(runtime.model, "gpt-5.6-sol");
 });
 
-test("uses an account token with a custom OpenAI-compatible relay", () => {
+test("a custom relay never receives deployment credentials", () => {
   const runtime = resolveAiRuntime(
-    { VERCEL_OIDC_TOKEN: "deployment-token" } as NodeJS.ProcessEnv,
-    "gpt-5-mini",
-    "account-token",
-    "https://relay.example.com/v1",
-  );
-  assert.equal(runtime.gateway, false);
-  assert.equal(runtime.endpoint, "https://relay.example.com/v1/chat/completions");
-  assert.equal(runtime.fallbackEndpoint, "https://relay.example.com/v1/responses");
-  assert.equal(runtime.token, "account-token");
-  assert.equal(runtime.model, "gpt-5-mini");
-});
-
-test("a configured relay never receives deployment Gateway credentials", () => {
-  const runtime = resolveAiRuntime(
-    { VERCEL_OIDC_TOKEN: "deployment-token" } as NodeJS.ProcessEnv,
-    "gpt-5-mini",
+    {
+      VERCEL_OIDC_TOKEN: "deployment-oidc-token",
+      OPENAI_API_KEY: "deployment-openai-key",
+    } as NodeJS.ProcessEnv,
+    "gpt-5.5",
     undefined,
-    "https://relay.example.com/v1",
+    "https://www.zenapi.org/v1",
   );
-  assert.equal(runtime.endpoint, "https://relay.example.com/v1/chat/completions");
   assert.equal(runtime.token, "");
+});
+
+test("Vercel AI Gateway receives the provider-prefixed selected model", () => {
+  const runtime = resolveAiRuntime(
+    { VERCEL_OIDC_TOKEN: "deployment-oidc-token" } as NodeJS.ProcessEnv,
+    "gpt-6-astra",
+  );
+  assert.equal(runtime.endpoint, "https://ai-gateway.vercel.sh/v1/responses");
+  assert.equal(runtime.model, "openai/gpt-6-astra");
+  assert.equal(runtime.token, "deployment-oidc-token");
 });
 
 test("extracts a blocked storefront through the reader compatibility payload", () => {

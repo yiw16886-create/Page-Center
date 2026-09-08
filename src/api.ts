@@ -70,6 +70,7 @@ export type ProductDraft = {
 };
 export type AiSettings = {
   aiTextModel: string;
+  availableModels: Array<{ id: string; label: string }>;
   aiBaseUrl: string;
   hasToken: boolean;
 };

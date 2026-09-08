@@ -46,15 +46,16 @@ Meta App 的 Valid OAuth Redirect URI 必须与 `META_REDIRECT_URI` 完全一致
 Product JSON-LD，提取商品名、描述、价格及最多 8 个原图 URL。页面 HTML、图片、
 商品目录和解析结果均不写入数据库，响应完成后即释放。
 
-用户可在“设置 → AI 连接与模型”保存自己的 API Token。中转站地址留空时默认使用
-OpenAI 官方 `https://api.openai.com/v1`；填写后改走该 OpenAI 兼容中转站，例如
-`https://relay.example.com/v1`。Token 使用 AES-256-GCM 加密并仅在服务端解密，
-浏览器只能看到是否已连接。自定义中转站优先使用 `/chat/completions`，遇到 404
-会自动尝试 `/responses`；Vercel AI Gateway 地址直接使用 `/responses`。账号 Token 的
-优先级高于 Vercel 自动注入的 OIDC Token 和部署环境中的 `AI_GATEWAY_API_KEY`。
+用户可在“设置 → AI 连接与模型”保存自己的 API Token 和 OpenAI 兼容中转站地址。
+模型通过白名单下拉框选择，可用项为 `gpt-5.5`、`gpt-5.6-luna`、
+`gpt-5.6-terra`、`gpt-5.6-sol` 和 `gpt-6-astra`，不接受任意模型 ID。
+中转站地址留空时使用 OpenAI
+官方 `https://api.openai.com/v1`；填写后改走该中转站，例如
+`https://www.zenapi.org/v1`。Token 使用 AES-256-GCM 加密并仅在服务端解密，
+浏览器只能看到是否已连接。
 
 AI 是发布区内的可选动作：解析商品后可以选择“使用原图”或“AI 文案”，未点击时
-不会调用模型。“设置 → AI 连接与模型”允许自由填写账号级文案模型。系统不提供
+不会调用模型。系统不提供
 AI 图片生成，数据库也不保存草稿、图片、Base64 或商品内容。
 
 中转站地址仅允许公开 HTTPS 主机，不接受用户名、密码、查询参数、私有 IP 或完整
