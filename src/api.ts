@@ -50,6 +50,15 @@ export type Post = {
   full_picture?: string;
   permalink_url?: string;
   is_published?: boolean;
+  scheduled_publish_time?: string | number;
+};
+export type Comment = {
+  id: string;
+  message?: string;
+  created_time?: string;
+  from?: { id?: string; name?: string };
+  can_remove?: boolean;
+  comments?: { data?: Comment[] };
 };
 export type PluginToken = {
   id: string;
@@ -137,6 +146,71 @@ export const api = {
   posts: (pageId: string) =>
     request<{ posts: Post[]; nextCursor: string | null }>(
       `/api/pages/${encodeURIComponent(pageId)}/posts`,
+    ),
+  scheduledPosts: (pageId: string) =>
+    request<{ posts: Post[]; nextCursor: string | null }>(
+      `/api/pages/${encodeURIComponent(pageId)}/scheduled-posts`,
+    ),
+  comments: (pageId: string, postId: string) =>
+    request<{ comments: Comment[]; nextCursor: string | null }>(
+      `/api/pages/${encodeURIComponent(pageId)}/posts/${encodeURIComponent(postId)}/comments`,
+    ),
+  replyComment: (pageId: string, commentId: string, message: string) =>
+    request<{ replyId: string }>(
+      `/api/pages/${encodeURIComponent(pageId)}/comments/${encodeURIComponent(commentId)}/replies`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          message,
+          confirmationText: `REPLY_COMMENT:${commentId}`,
+          idempotencyKey: crypto.randomUUID().replaceAll("-", ""),
+        }),
+      },
+    ),
+  deleteComment: (pageId: string, commentId: string) =>
+    request<void>(
+      `/api/pages/${encodeURIComponent(pageId)}/comments/${encodeURIComponent(commentId)}`,
+      {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({
+          confirmationText: `DELETE_COMMENT:${commentId}`,
+          idempotencyKey: crypto.randomUUID().replaceAll("-", ""),
+        }),
+      },
+    ),
+  deletePost: (pageId: string, postId: string) =>
+    request<void>(
+      `/api/pages/${encodeURIComponent(pageId)}/posts/${encodeURIComponent(postId)}`,
+      {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({
+          confirmationText: `DELETE_POST:${postId}`,
+          idempotencyKey: crypto.randomUUID().replaceAll("-", ""),
+        }),
+      },
+    ),
+  schedulePost: (
+    pageId: string,
+    message: string,
+    imageUrl: string,
+    scheduledAt: string,
+  ) =>
+    request<{ postId: string; scheduledAt: string }>(
+      `/api/pages/${encodeURIComponent(pageId)}/scheduled-posts`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          message,
+          imageUrl: imageUrl || undefined,
+          scheduledAt,
+          confirmationText: `SCHEDULE:${pageId}`,
+          idempotencyKey: crypto.randomUUID().replaceAll("-", ""),
+        }),
+      },
     ),
   publish: (
     pageId: string,

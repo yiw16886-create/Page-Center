@@ -104,7 +104,7 @@ export async function disconnect(userId: number) {
   ]);
 }
 
-async function authorizedPage(userId: number, pageId: string, capability: "canRead" | "canPublish") {
+async function authorizedPage(userId: number, pageId: string, capability: "canRead" | "canPublish" | "canManageComments") {
   const page = await prisma.authorizedPage.findUnique({ where: { userId_pageId: { userId, pageId } } });
   if (!page || page.status !== "ACTIVE" || !page[capability]) throw new Error("PAGE_NOT_AUTHORIZED");
   return { page, client: new PageClient(decryptToken(page.pageTokenCiphertext), process.env.META_GRAPH_API_VERSION || "v23.0") };
@@ -115,14 +115,257 @@ export async function listPosts(userId: number, pageId: string, after?: string) 
   return client.posts(pageId, 20, after);
 }
 
+export async function listScheduledPosts(userId: number, pageId: string, after?: string) {
+  const { client } = await authorizedPage(userId, pageId, "canPublish");
+  return client.scheduledPosts(pageId, 20, after);
+}
+
+function assertPageObject(objectId: string) {
+  if (!/^\d+(?:_\d+){0,2}$/.test(objectId))
+    throw new Error("META_OBJECT_INVALID");
+}
+
+function validateIdempotencyKey(key: string) {
+  if (!/^[A-Za-z0-9_-]{12,128}$/.test(key))
+    throw new Error("IDEMPOTENCY_KEY_INVALID");
+}
+
+function validateImageUrl(imageUrl?: string) {
+  if (!imageUrl) return undefined;
+  const url = new URL(imageUrl);
+  if (url.protocol !== "https:" || ["localhost", "127.0.0.1", "::1"].includes(url.hostname))
+    throw new Error("IMAGE_URL_INVALID");
+  return url.toString();
+}
+
+async function runIdempotentAction<T extends Record<string, unknown>>(input: {
+  userId: number;
+  pageId: string;
+  action: string;
+  idempotencyKey: string;
+  request: Record<string, unknown>;
+  run: () => Promise<T>;
+}) {
+  validateIdempotencyKey(input.idempotencyKey);
+  const requestHash = stableHash(input.request);
+  try {
+    await prisma.actionReceipt.create({
+      data: {
+        userId: input.userId,
+        action: input.action,
+        key: input.idempotencyKey,
+        requestHash,
+        resultJson: { state: "PENDING" },
+      },
+    });
+  } catch {
+    const previous = await prisma.actionReceipt.findUnique({
+      where: {
+        userId_action_key: {
+          userId: input.userId,
+          action: input.action,
+          key: input.idempotencyKey,
+        },
+      },
+    });
+    if (!previous || previous.requestHash !== requestHash)
+      throw new Error("IDEMPOTENCY_CONFLICT");
+    if ((previous.resultJson as any)?.state === "PENDING")
+      throw new Error("IDEMPOTENCY_IN_PROGRESS");
+    if ((previous.resultJson as any)?.state === "FAILED")
+      throw new Error("IDEMPOTENCY_PREVIOUS_FAILED");
+    return previous.resultJson as T;
+  }
+  try {
+    const result = await input.run();
+    await prisma.$transaction([
+      prisma.actionReceipt.update({
+        where: {
+          userId_action_key: {
+            userId: input.userId,
+            action: input.action,
+            key: input.idempotencyKey,
+          },
+        },
+        data: { resultJson: result },
+      }),
+      prisma.actionLog.create({
+        data: {
+          userId: input.userId,
+          action: input.action,
+          pageId: input.pageId,
+          status: "SUCCESS",
+          requestJson: input.request,
+          resultJson: result,
+        },
+      }),
+    ]);
+    return result;
+  } catch (error) {
+    await prisma.$transaction([
+      prisma.actionReceipt.update({
+        where: {
+          userId_action_key: {
+            userId: input.userId,
+            action: input.action,
+            key: input.idempotencyKey,
+          },
+        },
+        data: { resultJson: { state: "FAILED" } },
+      }),
+      prisma.actionLog.create({
+        data: {
+          userId: input.userId,
+          action: input.action,
+          pageId: input.pageId,
+          status: "FAILED",
+          requestJson: input.request,
+          errorMessage: error instanceof Error ? error.message : "UNKNOWN",
+        },
+      }),
+    ]);
+    throw error;
+  }
+}
+
+export async function listComments(userId: number, pageId: string, postId: string, after?: string) {
+  assertPageObject(postId);
+  const { client } = await authorizedPage(userId, pageId, "canRead");
+  return client.comments(postId, 50, after);
+}
+
+export async function replyToComment(input: {
+  userId: number;
+  pageId: string;
+  commentId: string;
+  message: string;
+  confirmationText: string;
+  idempotencyKey: string;
+}) {
+  assertPageObject(input.commentId);
+  if (input.confirmationText !== `REPLY_COMMENT:${input.commentId}`)
+    throw new Error("CONFIRMATION_REQUIRED");
+  const message = input.message.trim();
+  if (!message || message.length > 8000) throw new Error("COMMENT_MESSAGE_INVALID");
+  const { client } = await authorizedPage(input.userId, input.pageId, "canManageComments");
+  return runIdempotentAction({
+    userId: input.userId,
+    pageId: input.pageId,
+    action: "REPLY_COMMENT",
+    idempotencyKey: input.idempotencyKey,
+    request: { commentId: input.commentId, messageLength: message.length },
+    run: async () => {
+      const result = await client.replyToComment(input.commentId, message);
+      return { success: true, pageId: input.pageId, commentId: input.commentId, replyId: result.id };
+    },
+  });
+}
+
+export async function deleteComment(input: {
+  userId: number;
+  pageId: string;
+  commentId: string;
+  confirmationText: string;
+  idempotencyKey: string;
+}) {
+  assertPageObject(input.commentId);
+  if (input.confirmationText !== `DELETE_COMMENT:${input.commentId}`)
+    throw new Error("CONFIRMATION_REQUIRED");
+  const { client } = await authorizedPage(input.userId, input.pageId, "canManageComments");
+  return runIdempotentAction({
+    userId: input.userId,
+    pageId: input.pageId,
+    action: "DELETE_COMMENT",
+    idempotencyKey: input.idempotencyKey,
+    request: { commentId: input.commentId },
+    run: async () => {
+      const deletion = await client.deleteObject(input.commentId);
+      if (!deletion.success) throw new Error("META_DELETE_FAILED");
+      return { success: true, pageId: input.pageId, commentId: input.commentId };
+    },
+  });
+}
+
+export async function deletePost(input: {
+  userId: number;
+  pageId: string;
+  postId: string;
+  confirmationText: string;
+  idempotencyKey: string;
+}) {
+  assertPageObject(input.postId);
+  if (input.confirmationText !== `DELETE_POST:${input.postId}`)
+    throw new Error("CONFIRMATION_REQUIRED");
+  const { client } = await authorizedPage(input.userId, input.pageId, "canPublish");
+  return runIdempotentAction({
+    userId: input.userId,
+    pageId: input.pageId,
+    action: "DELETE_POST",
+    idempotencyKey: input.idempotencyKey,
+    request: { postId: input.postId },
+    run: async () => {
+      const deletion = await client.deleteObject(input.postId);
+      if (!deletion.success) throw new Error("META_DELETE_FAILED");
+      return { success: true, pageId: input.pageId, postId: input.postId };
+    },
+  });
+}
+
+export async function schedulePost(input: {
+  userId: number;
+  pageId: string;
+  message: string;
+  imageUrl?: string;
+  scheduledAt: string;
+  confirmationText: string;
+  idempotencyKey: string;
+}) {
+  if (input.confirmationText !== `SCHEDULE:${input.pageId}`)
+    throw new Error("CONFIRMATION_REQUIRED");
+  const message = input.message.trim();
+  if (!message || message.length > 63206) throw new Error("MESSAGE_INVALID");
+  const scheduledDate = new Date(input.scheduledAt);
+  const scheduledMs = scheduledDate.getTime();
+  if (!Number.isFinite(scheduledMs)) throw new Error("SCHEDULE_TIME_INVALID");
+  const now = Date.now();
+  if (scheduledMs < now + 10 * 60 * 1000 || scheduledMs > now + 180 * 24 * 60 * 60 * 1000)
+    throw new Error("SCHEDULE_TIME_OUT_OF_RANGE");
+  const imageUrl = validateImageUrl(input.imageUrl);
+  const { client } = await authorizedPage(input.userId, input.pageId, "canPublish");
+  return runIdempotentAction({
+    userId: input.userId,
+    pageId: input.pageId,
+    action: "SCHEDULE_POST",
+    idempotencyKey: input.idempotencyKey,
+    request: {
+      scheduledAt: scheduledDate.toISOString(),
+      messageLength: message.length,
+      imageHost: imageUrl ? new URL(imageUrl).hostname : null,
+    },
+    run: async () => {
+      const timestamp = Math.floor(scheduledMs / 1000);
+      const response = imageUrl
+        ? await client.schedulePhoto(input.pageId, message, imageUrl, timestamp)
+        : await client.scheduleText(input.pageId, message, timestamp);
+      const postId = ("post_id" in response ? response.post_id : undefined) || response.id;
+      if (!postId) throw new Error("META_POST_ID_MISSING");
+      return {
+        success: true,
+        pageId: input.pageId,
+        postId,
+        scheduledAt: scheduledDate.toISOString(),
+      };
+    },
+  });
+}
+
 export async function publishPost(input: { userId: number; pageId: string; message: string; imageUrl?: string; imageDataUrl?: string; confirmationText: string; idempotencyKey: string }) {
   if (input.confirmationText !== `PUBLISH:${input.pageId}`) throw new Error("CONFIRMATION_REQUIRED");
   if (!input.message.trim() || input.message.length > 63206) throw new Error("MESSAGE_INVALID");
   if (!/^[A-Za-z0-9_-]{12,128}$/.test(input.idempotencyKey)) throw new Error("IDEMPOTENCY_KEY_INVALID");
   if (input.imageUrl && input.imageDataUrl) throw new Error("IMAGE_SOURCE_CONFLICT");
   if (input.imageUrl) {
-    const url = new URL(input.imageUrl);
-    if (url.protocol !== "https:" || ["localhost", "127.0.0.1", "::1"].includes(url.hostname)) throw new Error("IMAGE_URL_INVALID");
+    validateImageUrl(input.imageUrl);
   }
   let generatedImage:
     | { bytes: Uint8Array; mediaType: "image/jpeg" | "image/png" }

@@ -24,12 +24,28 @@ import {
   api,
   type AiSettings,
   ApiError,
+  type Comment,
   type MetaStatus,
   type PluginToken,
   type Post,
   type ProductDraft,
   type User,
 } from "./api";
+
+function localDateTimeValue(date: Date) {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+function formatMetaTime(value?: string | number) {
+  if (value === undefined || value === null || value === "") return "时间未知";
+  const numeric = Number(value);
+  const date = Number.isFinite(numeric)
+    ? new Date(numeric < 1_000_000_000_000 ? numeric * 1000 : numeric)
+    : new Date(value);
+  return Number.isNaN(date.getTime()) ? "时间未知" : date.toLocaleString();
+}
 
 function Login({ onLogin }: { onLogin: (user: User) => void }) {
   const [email, setEmail] = useState("");
@@ -248,6 +264,20 @@ function aiCopyErrorMessage(error: unknown) {
   return code || "AI 文案生成失败";
 }
 
+function operationErrorMessage(error: unknown) {
+  const code = error instanceof Error ? error.message : "";
+  if (code === "PAGE_NOT_AUTHORIZED") return "当前主页没有执行此操作的权限";
+  if (code === "SCHEDULE_TIME_INVALID") return "请选择有效的定时发布时间";
+  if (code === "SCHEDULE_TIME_OUT_OF_RANGE")
+    return "发布时间需要在 10 分钟后至 180 天内";
+  if (code === "COMMENT_MESSAGE_INVALID") return "回复内容不能为空且不能超过 8,000 字";
+  if (code === "META_OBJECT_INVALID") return "Facebook 帖子或评论 ID 无效";
+  if (code === "META_DELETE_FAILED") return "Facebook 没有确认删除成功";
+  if (code.startsWith("META_GRAPH_ERROR_"))
+    return `Facebook API 操作失败（${code.replace("META_GRAPH_ERROR_", "错误码 ")}）`;
+  return code || "操作失败";
+}
+
 function ProductLinkAssistant({
   onText,
   onImage,
@@ -379,9 +409,14 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [meta, setMeta] = useState<MetaStatus | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
+  const [scheduledPosts, setScheduledPosts] = useState<Post[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentPostId, setCommentPostId] = useState("");
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [aiGatewayToken, setAiGatewayToken] = useState("");
   const [busy, setBusy] = useState("");
@@ -407,12 +442,42 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       return;
     }
     try {
-      setPosts((await api.posts(selectedId)).posts);
+      const value = await api.posts(selectedId);
+      setPosts(value.posts);
+      setCommentPostId((current) =>
+        value.posts.some((post) => post.id === current)
+          ? current
+          : value.posts[0]?.id || "",
+      );
     } catch {
       setPosts([]);
       toast.error("读取帖子失败，请检查主页读取权限");
     }
   }, [selectedId]);
+  const reloadScheduledPosts = useCallback(async () => {
+    if (!selectedId || !selected?.canPublish) {
+      setScheduledPosts([]);
+      return;
+    }
+    try {
+      setScheduledPosts((await api.scheduledPosts(selectedId)).posts);
+    } catch {
+      setScheduledPosts([]);
+      toast.error("读取定时帖子失败，请检查主页发布权限");
+    }
+  }, [selected?.canPublish, selectedId]);
+  const reloadComments = useCallback(async () => {
+    if (!selectedId || !commentPostId || !selected?.canRead) {
+      setComments([]);
+      return;
+    }
+    try {
+      setComments((await api.comments(selectedId, commentPostId)).comments);
+    } catch {
+      setComments([]);
+      toast.error("读取评论失败，请检查主页评论权限");
+    }
+  }, [commentPostId, selected?.canRead, selectedId]);
   useEffect(() => {
     void reloadMeta();
   }, [reloadMeta]);
@@ -424,6 +489,12 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   useEffect(() => {
     void reloadPosts();
   }, [reloadPosts]);
+  useEffect(() => {
+    void reloadScheduledPosts();
+  }, [reloadScheduledPosts]);
+  useEffect(() => {
+    if (activeTab === "comments") void reloadComments();
+  }, [activeTab, reloadComments]);
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (event.origin !== location.origin) return;
@@ -442,7 +513,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
     try {
       await action();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "操作失败");
+      toast.error(operationErrorMessage(error));
     } finally {
       setBusy("");
     }
@@ -507,8 +578,11 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             )}
           </div>
           <nav className="extension-nav" aria-label="扩展模块">
-            <button disabled title="即将开放">
-              <CalendarClock size={16} /> 自动化规则 <span>即将开放</span>
+            <button
+              className={activeTab === "publish" ? "active" : ""}
+              onClick={() => setActiveTab("publish")}
+            >
+              <CalendarClock size={16} /> 定时发布
             </button>
             <button
               className={activeTab === "settings" ? "active" : ""}
@@ -581,7 +655,6 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               onClick={() => setActiveTab("comments")}
             >
               <MessageSquareText size={15} /> 管理评论
-              <span className="beta-tag">预留</span>
             </button>
           </div>}
 
@@ -799,37 +872,127 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                     onChange={(e) => setImageUrl(e.target.value)}
                   />
                 )}
+                <div className="schedule-controls">
+                  <label>
+                    定时发布时间
+                    <input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      min={localDateTimeValue(new Date(Date.now() + 10 * 60 * 1000))}
+                      onChange={(event) => setScheduledAt(event.target.value)}
+                    />
+                  </label>
+                  <small>使用当前设备时区；需至少提前 10 分钟</small>
+                </div>
                 <div className="composer-foot">
                   <span>{message.length.toLocaleString()} / 63,206</span>
+                  <div className="publish-actions">
+                    <button
+                      disabled={
+                        !selected?.canPublish || !message.trim() || !scheduledAt || !!busy || !!imageDataUrl
+                      }
+                      onClick={() =>
+                        void act("schedule", async () => {
+                          if (
+                            !selected ||
+                            !confirm(`确认定时发布到“${selected.pageName}”？\n${new Date(scheduledAt).toLocaleString()}`)
+                          )
+                            return;
+                          const result = await api.schedulePost(
+                            selected.pageId,
+                            message,
+                            imageUrl,
+                            new Date(scheduledAt).toISOString(),
+                          );
+                          toast.success(`已加入 Facebook 定时发布：${result.postId}`);
+                          setMessage("");
+                          setImageUrl("");
+                          setScheduledAt("");
+                          await reloadScheduledPosts();
+                        })
+                      }
+                    >
+                      <CalendarClock size={15} />
+                      {busy === "schedule" ? "安排中…" : "定时发布"}
+                    </button>
+                    <button
+                      className="primary"
+                      disabled={
+                        !selected?.canPublish || !message.trim() || !!busy
+                      }
+                      onClick={() =>
+                        void act("publish", async () => {
+                          if (
+                            !selected ||
+                            !confirm(`确认立即发布到“${selected.pageName}”？`)
+                          )
+                            return;
+                          const result = await api.publish(
+                            selected.pageId,
+                            message,
+                            imageUrl,
+                            imageDataUrl,
+                          );
+                          toast.success(`发布成功：${result.postId}`);
+                          setMessage("");
+                          setImageUrl("");
+                          setImageDataUrl("");
+                          await reloadPosts();
+                        })
+                      }
+                    >
+                      {busy === "publish" ? "发布中…" : "立即发布"}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {activeTab === "publish" && (
+              <section className="panel scheduled-posts widget-primary">
+                <div className="panel-title">
+                  <div>
+                    <h2>定时帖子</h2>
+                    <p>由 Facebook 原生排程执行</p>
+                  </div>
                   <button
-                    className="primary"
-                    disabled={
-                      !selected?.canPublish || !message.trim() || !!busy
-                    }
-                    onClick={() =>
-                      void act("publish", async () => {
-                        if (
-                          !selected ||
-                          !confirm(`确认发布到“${selected.pageName}”？`)
-                        )
-                          return;
-                        const result = await api.publish(
-                          selected.pageId,
-                          message,
-                          imageUrl,
-                          imageDataUrl,
-                        );
-                        toast.success(`发布成功：${result.postId}`);
-                        setMessage("");
-                        setImageUrl("");
-                        setImageDataUrl("");
-                        await reloadPosts();
-                      })
-                    }
+                    className="icon-button"
+                    aria-label="刷新定时帖子"
+                    disabled={!selectedId || !!busy}
+                    onClick={() => void act("scheduled-posts", reloadScheduledPosts)}
                   >
-                    {busy === "publish" ? "发布中…" : "确认发布"}
+                    <RefreshCw size={16} />
                   </button>
                 </div>
+                {scheduledPosts.length ? (
+                  <div className="scheduled-list">
+                    {scheduledPosts.map((post) => (
+                      <article key={post.id}>
+                        <div className="post-content">
+                          <strong>{formatMetaTime(post.scheduled_publish_time)}</strong>
+                          <p>{post.message || "（图片帖子）"}</p>
+                        </div>
+                        <button
+                          className="danger icon-button"
+                          aria-label="取消定时帖子"
+                          disabled={!!busy}
+                          onClick={() => {
+                            if (selected && confirm("确认取消并删除这条定时帖子？"))
+                              void act(`delete-${post.id}`, async () => {
+                                await api.deletePost(selected.pageId, post.id);
+                                toast.success("定时帖子已取消");
+                                await reloadScheduledPosts();
+                              });
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <Empty icon={CalendarClock} title="暂无定时帖子" detail="选择时间后可将当前内容安排到 Facebook" />
+                )}
               </section>
             )}
 
@@ -860,7 +1023,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                         {post.full_picture && (
                           <img src={post.full_picture} alt="帖子图片" />
                         )}
-                        <div>
+                        <div className="post-content">
                           <p>{post.message || "（图片帖子）"}</p>
                           <span>
                             {post.created_time
@@ -877,6 +1040,21 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                             </a>
                           )}
                         </div>
+                        <button
+                          className="danger icon-button post-delete"
+                          aria-label="删除帖子"
+                          disabled={!!busy}
+                          onClick={() => {
+                            if (selected && confirm("确认永久删除这条 Facebook 帖子？此操作无法撤销。"))
+                              void act(`delete-${post.id}`, async () => {
+                                await api.deletePost(selected.pageId, post.id);
+                                toast.success("帖子已删除");
+                                await reloadPosts();
+                              });
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </article>
                     ))}
                   </div>
@@ -895,12 +1073,103 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             )}
 
             {activeTab === "comments" && (
-              <section className="panel widget-primary placeholder-panel">
-                <Empty
-                  icon={MessageSquareText}
-                  title="评论管理模块已预留"
-                  detail="后续可接入读取、回复、隐藏和删除评论工具"
-                />
+              <section className="panel comments-panel widget-primary">
+                <div className="panel-title">
+                  <div>
+                    <h2>评论管理</h2>
+                    <p>读取、回复和删除当前主页帖子的评论</p>
+                  </div>
+                  <button
+                    className="icon-button"
+                    aria-label="刷新评论"
+                    disabled={!commentPostId || !!busy}
+                    onClick={() => void act("comments", reloadComments)}
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+                {posts.length ? (
+                  <>
+                    <label className="comment-post-select">
+                      选择帖子
+                      <select
+                        value={commentPostId}
+                        onChange={(event) => setCommentPostId(event.target.value)}
+                      >
+                        {posts.map((post) => (
+                          <option key={post.id} value={post.id}>
+                            {(post.message || "图片帖子").slice(0, 80)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {comments.length ? (
+                      <div className="comment-list">
+                        {comments.map((comment) => (
+                          <article key={comment.id}>
+                            <div className="comment-meta">
+                              <strong>{comment.from?.name || "Facebook 用户"}</strong>
+                              <span>{formatMetaTime(comment.created_time)}</span>
+                            </div>
+                            <p>{comment.message || "（无文字评论）"}</p>
+                            {(comment.comments?.data || []).map((reply) => (
+                              <div className="comment-reply" key={reply.id}>
+                                <strong>{reply.from?.name || "主页回复"}</strong>
+                                <span>{reply.message || "（无文字回复）"}</span>
+                              </div>
+                            ))}
+                            <div className="comment-actions">
+                              <input
+                                value={replyDrafts[comment.id] || ""}
+                                maxLength={8000}
+                                placeholder="输入回复内容"
+                                disabled={!selected?.canManageComments || !!busy}
+                                onChange={(event) => setReplyDrafts((current) => ({
+                                  ...current,
+                                  [comment.id]: event.target.value,
+                                }))}
+                              />
+                              <button
+                                disabled={!selected?.canManageComments || !replyDrafts[comment.id]?.trim() || !!busy}
+                                onClick={() => {
+                                  const reply = replyDrafts[comment.id]?.trim();
+                                  if (selected && reply && confirm(`确认以“${selected.pageName}”回复这条评论？`))
+                                    void act(`reply-${comment.id}`, async () => {
+                                      await api.replyComment(selected.pageId, comment.id, reply);
+                                      setReplyDrafts((current) => ({ ...current, [comment.id]: "" }));
+                                      toast.success("评论回复成功");
+                                      await reloadComments();
+                                    });
+                                }}
+                              >
+                                回复
+                              </button>
+                              <button
+                                className="danger icon-button"
+                                aria-label="删除评论"
+                                disabled={!selected?.canManageComments || comment.can_remove === false || !!busy}
+                                onClick={() => {
+                                  if (selected && confirm("确认永久删除这条评论？此操作无法撤销。"))
+                                    void act(`delete-${comment.id}`, async () => {
+                                      await api.deleteComment(selected.pageId, comment.id);
+                                      toast.success("评论已删除");
+                                      await reloadComments();
+                                    });
+                                }}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <Empty icon={MessageSquareText} title="暂无评论" detail="选择帖子后刷新评论" />
+                    )}
+                  </>
+                ) : (
+                  <Empty icon={FileText} title="暂无帖子" detail="先发布帖子后再管理评论" />
+                )}
               </section>
             )}
 
@@ -921,7 +1190,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 <CalendarClock size={18} />
                 <div>
                   <strong>定时任务</strong>
-                  <span>扩展组件预留位</span>
+                  <span>{scheduledPosts.length} 条等待发布</span>
                 </div>
               </div>
               <div className="widget-slot">

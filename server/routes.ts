@@ -12,9 +12,15 @@ import { metaConfig, readiness } from "./config.js";
 import {
   completeAuthorization,
   createAuthorizationUrl,
+  deleteComment,
+  deletePost,
   disconnect,
+  listComments,
   listPosts,
+  listScheduledPosts,
   publishPost,
+  replyToComment,
+  schedulePost,
   status,
   verifyAuthorization,
 } from "./meta-service.js";
@@ -226,6 +232,92 @@ router.get(
       ),
     }),
   ),
+);
+router.delete(
+  "/pages/:pageId/posts/:postId",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) => {
+    const result = await deletePost({
+      userId: req.actor!.id,
+      pageId: req.params.pageId,
+      postId: req.params.postId,
+      confirmationText: String(req.body?.confirmationText || ""),
+      idempotencyKey: String(req.body?.idempotencyKey || ""),
+    });
+    res.json({ success: true, data: result });
+  }),
+);
+router.get(
+  "/pages/:pageId/posts/:postId/comments",
+  asyncRoute(async (req: AuthenticatedRequest, res) =>
+    res.json({
+      success: true,
+      data: await listComments(
+        req.actor!.id,
+        req.params.pageId,
+        req.params.postId,
+        typeof req.query.after === "string" ? req.query.after : undefined,
+      ),
+    }),
+  ),
+);
+router.post(
+  "/pages/:pageId/comments/:commentId/replies",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) => {
+    const result = await replyToComment({
+      userId: req.actor!.id,
+      pageId: req.params.pageId,
+      commentId: req.params.commentId,
+      message: String(req.body?.message || ""),
+      confirmationText: String(req.body?.confirmationText || ""),
+      idempotencyKey: String(req.body?.idempotencyKey || ""),
+    });
+    res.json({ success: true, data: result });
+  }),
+);
+router.delete(
+  "/pages/:pageId/comments/:commentId",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) => {
+    const result = await deleteComment({
+      userId: req.actor!.id,
+      pageId: req.params.pageId,
+      commentId: req.params.commentId,
+      confirmationText: String(req.body?.confirmationText || ""),
+      idempotencyKey: String(req.body?.idempotencyKey || ""),
+    });
+    res.json({ success: true, data: result });
+  }),
+);
+router.get(
+  "/pages/:pageId/scheduled-posts",
+  asyncRoute(async (req: AuthenticatedRequest, res) =>
+    res.json({
+      success: true,
+      data: await listScheduledPosts(
+        req.actor!.id,
+        req.params.pageId,
+        typeof req.query.after === "string" ? req.query.after : undefined,
+      ),
+    }),
+  ),
+);
+router.post(
+  "/pages/:pageId/scheduled-posts",
+  requireCsrf,
+  asyncRoute(async (req: AuthenticatedRequest, res) => {
+    const result = await schedulePost({
+      userId: req.actor!.id,
+      pageId: req.params.pageId,
+      message: String(req.body?.message || ""),
+      imageUrl: req.body?.imageUrl ? String(req.body.imageUrl) : undefined,
+      scheduledAt: String(req.body?.scheduledAt || ""),
+      confirmationText: String(req.body?.confirmationText || ""),
+      idempotencyKey: String(req.body?.idempotencyKey || ""),
+    });
+    res.json({ success: true, data: result });
+  }),
 );
 router.post(
   "/pages/:pageId/posts",

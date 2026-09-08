@@ -44,6 +44,24 @@ test("write endpoint requires CSRF, confirmation and idempotency", () => {
   assert.match(service, /ActionLog|actionLog/);
 });
 
+test("comment moderation, post deletion, and scheduling preserve write safeguards", () => {
+  const routes = read("server/routes.ts");
+  const service = read("server/meta-service.ts");
+  for (const path of [
+    "/pages/:pageId/posts/:postId",
+    "/pages/:pageId/comments/:commentId/replies",
+    "/pages/:pageId/comments/:commentId",
+    "/pages/:pageId/scheduled-posts",
+  ]) assert.match(routes, new RegExp(path.replaceAll("/", "\\/")));
+  assert.match(service, /REPLY_COMMENT:/);
+  assert.match(service, /DELETE_COMMENT:/);
+  assert.match(service, /DELETE_POST:/);
+  assert.match(service, /SCHEDULE:/);
+  assert.match(service, /runIdempotentAction/);
+  assert.match(service, /canManageComments/);
+  assert.match(service, /10 \* 60 \* 1000/);
+});
+
 test("login distinguishes invalid credentials from service initialization errors", () => {
   const api = read("src/api.ts");
   const app = read("src/App.tsx");
@@ -217,4 +235,16 @@ test("AI copy generation remains opt-in and image generation is absent", () => {
   assert.match(meta, /IMAGE_DATA_TOO_LARGE/);
   assert.doesNotMatch(schema, /PostDraft|GeneratedImage|imageData|imageUrl/);
   assert.doesNotMatch(schema, /aiImageModel/);
+});
+
+test("dashboard exposes comments, replies, deletion, and native scheduling", () => {
+  const app = read("src/App.tsx");
+  const api = read("src/api.ts");
+  assert.match(app, /评论管理/);
+  assert.match(app, /replyComment/);
+  assert.match(app, /deleteComment/);
+  assert.match(app, /deletePost/);
+  assert.match(app, /定时发布/);
+  assert.match(api, /scheduled-posts/);
+  assert.doesNotMatch(app, /评论管理模块已预留/);
 });
