@@ -25,7 +25,6 @@ import {
 } from "./plugin-token-service.js";
 import {
   generateFacebookCopy,
-  generateFacebookImage,
   parseProductUrl,
   type ProductDraft,
 } from "./product-draft-service.js";
@@ -137,7 +136,6 @@ router.put(
       data: await saveAiSettings(
         req.actor!.id,
         String(req.body?.textModel || ""),
-        String(req.body?.imageModel || ""),
         String(req.body?.baseUrl || ""),
         typeof req.body?.token === "string" ? req.body.token : undefined,
         req.body?.clearToken === true,
@@ -179,32 +177,6 @@ router.post(
         gatewayToken: settings.gatewayToken,
         baseUrl: settings.aiBaseUrl,
       }),
-    });
-  }),
-);
-router.post(
-  "/product-drafts/generate-image",
-  requireCsrf,
-  asyncRoute(async (req: AuthenticatedRequest, res) => {
-    const input = req.body?.product || {};
-    const product: ProductDraft = {
-      sourceUrl: String(input.sourceUrl || "").slice(0, 2048),
-      title: String(input.title || "").slice(0, 300),
-      description: String(input.description || "").slice(0, 4000),
-      price: input.price ? String(input.price).slice(0, 100) : null,
-      imageUrls: [],
-    };
-    if (!product.sourceUrl || !product.title)
-      throw new Error("PRODUCT_DRAFT_INVALID");
-    const settings = await getAiRuntimeSettings(req.actor!.id);
-    res.set("Cache-Control", "no-store").json({
-      success: true,
-      data: await generateFacebookImage(
-        product,
-        settings.aiImageModel,
-        settings.gatewayToken,
-        settings.aiBaseUrl,
-      ),
     });
   }),
 );

@@ -70,7 +70,6 @@ export type ProductDraft = {
 };
 export type AiSettings = {
   aiTextModel: string;
-  aiImageModel: string;
   aiBaseUrl: string;
   hasToken: boolean;
 };
@@ -111,14 +110,13 @@ export const api = {
   aiSettings: () => request<AiSettings>("/api/settings/ai"),
   saveAiSettings: (
     textModel: string,
-    imageModel: string,
     baseUrl: string,
     options: { token?: string; clearToken?: boolean } = {},
   ) =>
     request<AiSettings>("/api/settings/ai", {
       method: "PUT",
       headers,
-      body: JSON.stringify({ textModel, imageModel, baseUrl, ...options }),
+      body: JSON.stringify({ textModel, baseUrl, ...options }),
     }),
   parseProduct: (url: string) =>
     request<ProductDraft>("/api/product-drafts/parse", {
@@ -135,15 +133,6 @@ export const api = {
       headers,
       body: JSON.stringify({ product, ...options }),
     }),
-  generateProductImage: (product: ProductDraft) =>
-    request<{ imageDataUrl: string; model: string }>(
-      "/api/product-drafts/generate-image",
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ product }),
-      },
-    ),
   posts: (pageId: string) =>
     request<{ posts: Post[]; nextCursor: string | null }>(
       `/api/pages/${encodeURIComponent(pageId)}/posts`,

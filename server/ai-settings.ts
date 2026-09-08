@@ -4,22 +4,11 @@ import { assertPublicAiBaseUrl } from "./ai-endpoint.js";
 
 const MODEL_ID = /^[a-z0-9][a-z0-9._:/-]{0,192}$/i;
 
-export function validateAiModels(textModel: string, imageModel: string) {
+export function validateAiModel(textModel: string) {
   const normalizedText = textModel.trim();
-  const normalizedImage = imageModel.trim();
   if (!MODEL_ID.test(normalizedText) || normalizedText.includes("//"))
     throw new Error("AI_TEXT_MODEL_INVALID");
-  if (!MODEL_ID.test(normalizedImage) || normalizedImage.includes("//"))
-    throw new Error("AI_IMAGE_MODEL_INVALID");
-  return { textModel: normalizedText, imageModel: normalizedImage };
-}
-
-export function aiPreferenceData(textModel: string, imageModel: string) {
-  const values = validateAiModels(textModel, imageModel);
-  return {
-    aiTextModel: values.textModel,
-    aiImageModel: values.imageModel,
-  };
+  return normalizedText;
 }
 
 export async function getAiSettings(userId: number) {
@@ -27,7 +16,6 @@ export async function getAiSettings(userId: number) {
     where: { id: userId },
     select: {
       aiTextModel: true,
-      aiImageModel: true,
       aiBaseUrl: true,
       aiGatewayTokenCiphertext: true,
     },
@@ -35,7 +23,6 @@ export async function getAiSettings(userId: number) {
   if (!user) throw new Error("USER_INACTIVE");
   return {
     aiTextModel: user.aiTextModel,
-    aiImageModel: user.aiImageModel,
     aiBaseUrl: user.aiBaseUrl || "",
     hasToken: Boolean(user.aiGatewayTokenCiphertext),
   };
@@ -46,7 +33,6 @@ export async function getAiRuntimeSettings(userId: number) {
     where: { id: userId },
     select: {
       aiTextModel: true,
-      aiImageModel: true,
       aiBaseUrl: true,
       aiGatewayTokenCiphertext: true,
     },
@@ -54,7 +40,6 @@ export async function getAiRuntimeSettings(userId: number) {
   if (!user) throw new Error("USER_INACTIVE");
   return {
     aiTextModel: user.aiTextModel,
-    aiImageModel: user.aiImageModel,
     aiBaseUrl: user.aiBaseUrl || undefined,
     gatewayToken: user.aiGatewayTokenCiphertext
       ? decryptToken(user.aiGatewayTokenCiphertext)
@@ -72,18 +57,16 @@ export function validateGatewayToken(token: string) {
 export async function saveAiSettings(
   userId: number,
   textModel: string,
-  imageModel: string,
   baseUrl: string,
   token?: string,
   clearToken = false,
 ) {
   const data: {
     aiTextModel: string;
-    aiImageModel: string;
     aiBaseUrl: string | null;
     aiGatewayTokenCiphertext?: string | null;
   } = {
-    ...aiPreferenceData(textModel, imageModel),
+    aiTextModel: validateAiModel(textModel),
     aiBaseUrl: baseUrl.trim() ? await assertPublicAiBaseUrl(baseUrl) : null,
   };
   if (clearToken) data.aiGatewayTokenCiphertext = null;

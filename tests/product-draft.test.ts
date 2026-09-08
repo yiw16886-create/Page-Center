@@ -78,6 +78,7 @@ test("uses an account token with a custom OpenAI-compatible relay", () => {
   );
   assert.equal(runtime.gateway, false);
   assert.equal(runtime.endpoint, "https://relay.example.com/v1/chat/completions");
+  assert.equal(runtime.fallbackEndpoint, "https://relay.example.com/v1/responses");
   assert.equal(runtime.token, "account-token");
   assert.equal(runtime.model, "gpt-5-mini");
 });

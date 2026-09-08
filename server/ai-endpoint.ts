@@ -60,14 +60,11 @@ export async function assertPublicAiBaseUrl(value: string) {
   return normalized;
 }
 
-export function aiEndpoint(baseUrl: string, kind: "text" | "image") {
+export function aiEndpoint(baseUrl: string) {
   const gateway = new URL(baseUrl).hostname === "ai-gateway.vercel.sh";
   return {
     gateway,
-    url: `${baseUrl}${kind === "image"
-      ? "/images/generations"
-      : gateway
-        ? "/responses"
-        : "/chat/completions"}`,
+    url: `${baseUrl}${gateway ? "/responses" : "/chat/completions"}`,
+    fallbackUrl: gateway ? undefined : `${baseUrl}/responses`,
   };
 }

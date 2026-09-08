@@ -6,7 +6,6 @@ import {
   Copy,
   ExternalLink,
   FileText,
-  ImagePlus,
   KeyRound,
   LogOut,
   MessageSquareText,
@@ -236,6 +235,17 @@ function PluginAccess() {
   );
 }
 
+function aiCopyErrorMessage(error: unknown) {
+  const code = error instanceof Error ? error.message : "";
+  if (code === "AI_NOT_CONFIGURED") return "请先在设置中填写 API Token";
+  if (code === "AI_AUTH_INVALID") return "API Token 无效或没有调用权限";
+  if (code === "AI_RELAY_ENDPOINT_OR_MODEL_NOT_FOUND")
+    return "中转站不支持该接口或模型，请检查基础地址和文案模型 ID";
+  if (code === "AI_RATE_LIMITED") return "AI 请求过于频繁，请稍后重试";
+  if (code === "AI_BUDGET_EXCEEDED") return "AI 账户余额或预算不足";
+  return code || "AI 文案生成失败";
+}
+
 function ProductLinkAssistant({
   onText,
   onImage,
@@ -349,34 +359,11 @@ function ProductLinkAssistant({
                       onText(message);
                       toast.success("AI 文案已生成，可继续人工修改");
                     })
-                    .catch((error) => toast.error(
-                      error instanceof Error && error.message === "AI_NOT_CONFIGURED"
-                        ? "AI 生成服务尚未配置"
-                        : error instanceof Error ? error.message : "AI 文案生成失败",
-                    ))
+                    .catch((error) => toast.error(aiCopyErrorMessage(error)))
                     .finally(() => setBusy(""));
                 }}
               >
                 <Sparkles size={15} /> {busy === "copy" ? "生成中…" : "AI 文案"}
-              </button>
-              <button
-                type="button"
-                disabled={!!busy}
-                onClick={() => {
-                  setBusy("image");
-                  void api.generateProductImage(draft)
-                    .then(({ imageDataUrl }) => {
-                      setPreviewImage(imageDataUrl);
-                      onImage("", imageDataUrl);
-                      toast.success("AI 配图已生成，仅保留在当前草稿");
-                    })
-                    .catch((error) => toast.error(
-                      error instanceof Error ? error.message : "AI 配图生成失败",
-                    ))
-                    .finally(() => setBusy(""));
-                }}
-              >
-                <ImagePlus size={15} /> {busy === "image" ? "生成中…" : "AI 配图"}
               </button>
             </div>
           </div>
@@ -699,18 +686,6 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           })}
                         />
                       </label>
-                      <label>
-                        图片模型 ID
-                        <input
-                          value={aiSettings.aiImageModel}
-                          maxLength={193}
-                          placeholder="bfl/flux-2-pro"
-                          onChange={(event) => setAiSettings({
-                            ...aiSettings,
-                            aiImageModel: event.target.value,
-                          })}
-                        />
-                      </label>
                       <label className="ai-token-field">
                         中转站 API 基础地址
                         <input
@@ -745,7 +720,6 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                         onClick={() => void act("ai-settings", async () => {
                           const saved = await api.saveAiSettings(
                             aiSettings.aiTextModel,
-                            aiSettings.aiImageModel,
                             aiSettings.aiBaseUrl,
                             { token: aiGatewayToken || undefined },
                           );
@@ -765,7 +739,6 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                               void act("ai-token-delete", async () => {
                                 const saved = await api.saveAiSettings(
                                   aiSettings.aiTextModel,
-                                  aiSettings.aiImageModel,
                                   aiSettings.aiBaseUrl,
                                   { clearToken: true },
                                 );

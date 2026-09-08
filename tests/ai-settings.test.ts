@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  aiPreferenceData,
-  validateAiModels,
+  validateAiModel,
   validateGatewayToken,
 } from "../server/ai-settings.js";
 import {
@@ -10,25 +9,22 @@ import {
   normalizeAiBaseUrl,
 } from "../server/ai-endpoint.js";
 
-test("AI settings accept custom Gateway model IDs", () => {
-  assert.deepEqual(
-    validateAiModels(" anthropic/claude-sonnet-5 ", "openai/gpt-image-2"),
-    { textModel: "anthropic/claude-sonnet-5", imageModel: "openai/gpt-image-2" },
+test("AI settings accept a custom text model ID", () => {
+  assert.equal(
+    validateAiModel(" anthropic/claude-sonnet-5 "),
+    "anthropic/claude-sonnet-5",
   );
 });
 
 test("AI settings accept relay model names and reject malformed IDs", () => {
-  assert.deepEqual(validateAiModels("gpt-5-mini", "flux-pro"), {
-    textModel: "gpt-5-mini",
-    imageModel: "flux-pro",
-  });
+  assert.equal(validateAiModel("gpt-5-mini"), "gpt-5-mini");
   assert.throws(
-    () => validateAiModels("/missing-name", "bfl/flux-2-pro"),
+    () => validateAiModel("/missing-name"),
     /AI_TEXT_MODEL_INVALID/,
   );
   assert.throws(
-    () => validateAiModels("openai/gpt-5-mini", "https:\/\/example.com/model"),
-    /AI_IMAGE_MODEL_INVALID/,
+    () => validateAiModel("https:\/\/example.com/model"),
+    /AI_TEXT_MODEL_INVALID/,
   );
 });
 
@@ -44,11 +40,15 @@ test("AI relay base URLs require public HTTPS-compatible syntax", () => {
     "https://relay.example.com/v1",
   );
   assert.equal(
-    aiEndpoint("https://relay.example.com/v1", "text").url,
+    aiEndpoint("https://relay.example.com/v1").url,
     "https://relay.example.com/v1/chat/completions",
   );
   assert.equal(
-    aiEndpoint("https://ai-gateway.vercel.sh/v1", "text").url,
+    aiEndpoint("https://relay.example.com/v1").fallbackUrl,
+    "https://relay.example.com/v1/responses",
+  );
+  assert.equal(
+    aiEndpoint("https://ai-gateway.vercel.sh/v1").url,
     "https://ai-gateway.vercel.sh/v1/responses",
   );
   assert.throws(
@@ -62,15 +62,5 @@ test("AI relay base URLs require public HTTPS-compatible syntax", () => {
   assert.throws(
     () => normalizeAiBaseUrl("https://relay.example.com/v1/chat/completions"),
     /AI_BASE_URL_MUST_BE_BASE/,
-  );
-});
-
-test("AI settings map API names to the Prisma user fields", () => {
-  assert.deepEqual(
-    aiPreferenceData("openai/gpt-5-mini", "bfl/flux-2-pro"),
-    {
-      aiTextModel: "openai/gpt-5-mini",
-      aiImageModel: "bfl/flux-2-pro",
-    },
   );
 });

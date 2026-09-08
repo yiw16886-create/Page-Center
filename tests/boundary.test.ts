@@ -201,17 +201,18 @@ test("custom AI Gateway tokens are encrypted and never returned to the browser",
   assert.match(read("server/product-draft-service.ts"), /redirect: "error"/);
 });
 
-test("AI generation remains opt-in and generated images are not persisted", () => {
+test("AI copy generation remains opt-in and image generation is absent", () => {
   const app = read("src/App.tsx");
   const routes = read("server/routes.ts");
   const schema = read("prisma/schema.prisma");
   const meta = read("server/meta-service.ts");
   assert.match(app, /AI 文案/);
-  assert.match(app, /AI 配图/);
+  assert.doesNotMatch(app, /AI 配图|图片模型 ID/);
   assert.match(app, /只有点击 AI 按钮时才会调用并计费/);
   assert.match(routes, /\/settings\/ai/);
-  assert.match(routes, /\/product-drafts\/generate-image/);
+  assert.doesNotMatch(routes, /\/product-drafts\/generate-image/);
   assert.match(meta, /imageDataHash/);
   assert.match(meta, /IMAGE_DATA_TOO_LARGE/);
   assert.doesNotMatch(schema, /PostDraft|GeneratedImage|imageData|imageUrl/);
+  assert.doesNotMatch(schema, /aiImageModel/);
 });
