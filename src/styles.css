@@ -708,6 +708,10 @@ button:disabled {
 .widget-secondary {
   grid-column: span 4;
 }
+.overview-widget {
+  grid-column: 9 / -1;
+  grid-row: 1;
+}
 .widget-full {
   grid-column: 1/-1;
 }
@@ -1025,6 +1029,9 @@ button:disabled {
   .widget-primary,
   .widget-secondary {
     grid-column: 1/-1;
+  }
+  .overview-widget {
+    grid-row: auto;
   }
   .page-toolbar {
     align-items: flex-start;

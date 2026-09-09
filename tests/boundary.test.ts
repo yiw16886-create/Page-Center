@@ -253,6 +253,7 @@ test("page sidebar shows public page details instead of OAuth capabilities", () 
   const app = read("src/App.tsx");
   const client = read("server/meta-client.ts");
   const schema = read("prisma/schema.prisma");
+  const styles = read("src/styles.css");
   assert.match(app, /公共主页详细信息/);
   assert.match(app, /主页名称/);
   assert.match(app, /Page ID/);
@@ -267,4 +268,5 @@ test("page sidebar shows public page details instead of OAuth capabilities", () 
   assert.match(app, /最近同步/);
   assert.doesNotMatch(app, /<h2>主页能力<\/h2>/);
   assert.doesNotMatch(app, /当前 OAuth 权限快照/);
+  assert.match(styles, /\.overview-widget\s*{[^}]*grid-column:\s*9\s*\/\s*-1;[^}]*grid-row:\s*1;/s);
 });
