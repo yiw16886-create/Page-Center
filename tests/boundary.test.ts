@@ -248,3 +248,23 @@ test("dashboard exposes comments, replies, deletion, and native scheduling", () 
   assert.match(api, /scheduled-posts/);
   assert.doesNotMatch(app, /评论管理模块已预留/);
 });
+
+test("page sidebar shows public page details instead of OAuth capabilities", () => {
+  const app = read("src/App.tsx");
+  const client = read("server/meta-client.ts");
+  const schema = read("prisma/schema.prisma");
+  assert.match(app, /公共主页详细信息/);
+  assert.match(app, /主页名称/);
+  assert.match(app, /Page ID/);
+  assert.match(app, /主页类别/);
+  assert.match(app, /主页链接/);
+  assert.match(app, /联系电话/);
+  assert.match(app, /联系邮箱/);
+  assert.match(app, /联系地址/);
+  assert.match(client, /link,website,phone,emails,single_line_address/);
+  assert.match(schema, /pageLink\s+String\?/);
+  assert.match(schema, /emails\s+String\s+@default\("\[\]"\)/);
+  assert.match(app, /最近同步/);
+  assert.doesNotMatch(app, /<h2>主页能力<\/h2>/);
+  assert.doesNotMatch(app, /当前 OAuth 权限快照/);
+});

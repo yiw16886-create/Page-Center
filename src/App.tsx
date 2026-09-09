@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
   CalendarClock,
   Check,
   Copy,
@@ -45,6 +44,16 @@ function formatMetaTime(value?: string | number) {
     ? new Date(numeric < 1_000_000_000_000 ? numeric * 1000 : numeric)
     : new Date(value);
   return Number.isNaN(date.getTime()) ? "时间未知" : date.toLocaleString();
+}
+
+function safeExternalLink(value?: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function Login({ onLogin }: { onLogin: (user: User) => void }) {
@@ -1176,30 +1185,93 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             {activeTab !== "settings" && <section className="panel widget-secondary overview-widget">
               <div className="panel-title">
                 <div>
-                  <h2>主页能力</h2>
-                  <p>当前 OAuth 权限快照</p>
+                  <h2>公共主页详细信息</h2>
+                  <p>当前选择的公共主页资料</p>
                 </div>
-                <KeyRound />
+                <button
+                  className="icon-button"
+                  aria-label="同步公共主页详细信息"
+                  title="同步公共主页详细信息"
+                  disabled={!meta?.connected || !!busy}
+                  onClick={() =>
+                    void act("page-details", async () => {
+                      await api.verify();
+                      await reloadMeta();
+                      toast.success("公共主页详细信息已同步");
+                    })
+                  }
+                >
+                  <RefreshCw size={16} />
+                </button>
               </div>
-              <div className="capability-list">
-                <Badge ok={!!selected?.canRead}>读取帖子</Badge>
-                <Badge ok={!!selected?.canPublish}>发布帖子</Badge>
-                <Badge ok={!!selected?.canManageComments}>管理评论</Badge>
-              </div>
-              <div className="widget-slot">
-                <CalendarClock size={18} />
-                <div>
-                  <strong>定时任务</strong>
-                  <span>{scheduledPosts.length} 条等待发布</span>
+              {selected ? (
+                <>
+                  <dl className="page-detail-list">
+                    <div>
+                      <dt>主页名称</dt>
+                      <dd>{selected.pageName}</dd>
+                    </div>
+                    <div>
+                      <dt>Page ID</dt>
+                      <dd className="page-id-value">{selected.pageId}</dd>
+                    </div>
+                    <div>
+                      <dt>主页类别</dt>
+                      <dd>{selected.category || "公共主页"}</dd>
+                    </div>
+                    <div>
+                      <dt>主页链接</dt>
+                      <dd>{selected.pageLink || "未填写"}</dd>
+                    </div>
+                    <div>
+                      <dt>网站</dt>
+                      <dd>{selected.website || "未填写"}</dd>
+                    </div>
+                    <div>
+                      <dt>联系电话</dt>
+                      <dd>{selected.phone || "未填写"}</dd>
+                    </div>
+                    <div>
+                      <dt>联系邮箱</dt>
+                      <dd>{selected.emails.length ? selected.emails.join("、") : "未填写"}</dd>
+                    </div>
+                    <div>
+                      <dt>联系地址</dt>
+                      <dd>{selected.address || "未填写"}</dd>
+                    </div>
+                    <div>
+                      <dt>同步状态</dt>
+                      <dd>
+                        <span className={`page-status ${selected.status === "ACTIVE" ? "online" : ""}`}>
+                          <span className="status-dot" />
+                          {selected.status === "ACTIVE" ? "已连接" : "未连接"}
+                        </span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>最近同步</dt>
+                      <dd>{selected.lastVerifiedAt ? formatMetaTime(selected.lastVerifiedAt) : "尚未记录"}</dd>
+                    </div>
+                    <div>
+                      <dt>定时帖子</dt>
+                      <dd>{scheduledPosts.length} 条等待发布</dd>
+                    </div>
+                  </dl>
+                  <a
+                    className="page-public-link"
+                    href={safeExternalLink(selected.pageLink) || `https://www.facebook.com/${selected.pageId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    查看 Facebook 公共主页 <ExternalLink size={13} />
+                  </a>
+                </>
+              ) : (
+                <div className="page-detail-empty">
+                  <FileText size={20} />
+                  <span>请先选择一个公共主页</span>
                 </div>
-              </div>
-              <div className="widget-slot">
-                <BarChart3 size={18} />
-                <div>
-                  <strong>数据概览</strong>
-                  <span>扩展组件预留位</span>
-                </div>
-              </div>
+              )}
             </section>}
           </div>
         </section>

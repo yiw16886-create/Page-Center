@@ -113,6 +113,11 @@ model AuthorizedPage {
   pageId              String
   pageName            String
   category            String?
+  pageLink            String?
+  website             String?
+  phone               String?
+  emails              String    @default("[]")
+  address             String?
   tasks               String
   pageTokenCiphertext String    @db.Text
   canRead             Boolean   @default(false)

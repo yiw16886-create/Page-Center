@@ -2,7 +2,18 @@ import type { ReturnTypeMetaConfig } from "./types.js";
 
 type GraphError = { error?: { code?: number; error_subcode?: number; message?: string } };
 
-export type MetaPage = { id: string; name: string; category?: string; access_token: string; tasks?: string[] };
+export type MetaPage = {
+  id: string;
+  name: string;
+  category?: string;
+  access_token: string;
+  tasks?: string[];
+  link?: string;
+  website?: string;
+  phone?: string;
+  emails?: string[];
+  single_line_address?: string;
+};
 export type MetaPermission = { permission: string; status: string };
 export type MetaComment = {
   id: string;
@@ -43,7 +54,11 @@ export class MetaClient {
 
   async pages(token: string) {
     const url = new URL(`https://graph.facebook.com/${this.config.graphVersion}/me/accounts`);
-    url.search = new URLSearchParams({ fields: "id,name,category,access_token,tasks", limit: "100", access_token: token }).toString();
+    url.search = new URLSearchParams({
+      fields: "id,name,category,access_token,tasks,link,website,phone,emails,single_line_address",
+      limit: "100",
+      access_token: token,
+    }).toString();
     return (await this.graph<{ data?: MetaPage[] }>(url)).data || [];
   }
 }

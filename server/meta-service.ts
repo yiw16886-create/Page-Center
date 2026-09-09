@@ -38,7 +38,20 @@ async function saveAuthorization(input: { actor: Actor; identity: { id: string; 
     await tx.authorizedPage.updateMany({ where: { userId: input.actor.id }, data: { status: "REVOKED", lastVerifiedAt: now } });
     for (const page of input.pages) {
       if (!page.id || !page.name || !page.access_token) continue;
-      const data = { pageName: page.name, category: page.category || null, tasks: JSON.stringify(page.tasks || []), pageTokenCiphertext: encryptToken(page.access_token), ...capabilities(page, granted), status: "ACTIVE", lastVerifiedAt: now };
+      const data = {
+        pageName: page.name,
+        category: page.category || null,
+        pageLink: page.link || null,
+        website: page.website || null,
+        phone: page.phone || null,
+        emails: JSON.stringify(page.emails || []),
+        address: page.single_line_address || null,
+        tasks: JSON.stringify(page.tasks || []),
+        pageTokenCiphertext: encryptToken(page.access_token),
+        ...capabilities(page, granted),
+        status: "ACTIVE",
+        lastVerifiedAt: now,
+      };
       await tx.authorizedPage.upsert({ where: { userId_pageId: { userId: input.actor.id, pageId: page.id } }, update: data, create: { userId: input.actor.id, pageId: page.id, ...data } });
     }
   });
@@ -82,7 +95,11 @@ export async function status(userId: number) {
     grantedScopes: authorization?.grantedScopes.split(/\s+/).filter(Boolean) || [],
     tokenExpiresAt: authorization?.tokenExpiresAt || null,
     lastVerifiedAt: authorization?.lastVerifiedAt || null,
-    pages: pages.map(({ pageTokenCiphertext: _token, tasks, ...page }: any) => ({ ...page, tasks: JSON.parse(tasks) as string[] })),
+    pages: pages.map(({ pageTokenCiphertext: _token, tasks, emails, ...page }: any) => ({
+      ...page,
+      tasks: JSON.parse(tasks) as string[],
+      emails: JSON.parse(emails) as string[],
+    })),
   };
 }
 

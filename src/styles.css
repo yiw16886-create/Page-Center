@@ -871,12 +871,6 @@ button:disabled {
   color: #b91c1c;
   border-color: #fecaca;
 }
-.capability-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 14px 0 12px;
-}
 .badge {
   display: inline-flex;
   align-items: center;
@@ -892,27 +886,62 @@ button:disabled {
   background: #dcfce7;
   color: #15803d;
 }
-.widget-slot {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px;
-  margin-top: 7px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 10px;
-  color: #64748b;
-  background: #f8fafc;
-}
-.widget-slot > div {
+.page-detail-list {
   display: grid;
-  gap: 2px;
+  gap: 0;
+  margin: 12px 0 10px;
 }
-.widget-slot strong {
-  color: #334155;
-  font-size: 11px;
+.page-detail-list div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #edf1f6;
 }
-.widget-slot span {
+.page-detail-list dt {
+  color: #64748b;
   font-size: 10px;
+}
+.page-detail-list dd {
+  min-width: 0;
+  margin: 0;
+  color: #253047;
+  font-size: 11px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.page-id-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.page-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #64748b;
+}
+.page-status.online {
+  color: #15803d;
+}
+.page-public-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.page-public-link:hover {
+  text-decoration: underline;
+}
+.page-detail-empty {
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  min-height: 150px;
+  color: #94a3b8;
+  font-size: 11px;
 }
 .placeholder-panel {
   min-height: 282px;

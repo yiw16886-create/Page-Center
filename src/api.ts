@@ -30,10 +30,16 @@ export type Page = {
   pageId: string;
   pageName: string;
   category: string | null;
+  pageLink: string | null;
+  website: string | null;
+  phone: string | null;
+  emails: string[];
+  address: string | null;
   canRead: boolean;
   canPublish: boolean;
   canManageComments: boolean;
   status: string;
+  lastVerifiedAt: string | null;
 };
 export type MetaStatus = {
   connected: boolean;
